@@ -1,0 +1,43 @@
+<idea-plugin>
+    <id>com.ivianuu.debuglog</id>
+    <name>Debuglog</name>
+    <version>1.0</version>
+    <vendor email="support@yourcompany.com" url="http://www.yourcompany.com">YourCompany</vendor>
+
+    <description><![CDATA[
+      Enter short description for your plugin here.<br>
+      <em>most HTML tags may be used</em>
+    ]]></description>
+
+    <change-notes><![CDATA[
+      Add change notes here.<br>
+      <em>most HTML tags may be used</em>
+    ]]>
+    </change-notes>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/build_number_ranges.html for description -->
+    <idea-version since-build="141"/>
+
+    <!-- please see http://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html
+         on how to target different products -->
+    uncomment to enable plugin in all products
+    <depends>org.jetbrains.kotlin</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <gotoDeclarationHandler implementation="com.ivianuu.debuglog.MyGotoDeclarationHandler"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <packageFragmentProviderExtension implementation="com.ivianuu.debuglog.MyPackageFragmentProviderExtension"/>
+        <classBuilderFactoryInterceptorExtension
+                implementation="com.ivianuu.debuglog.MyClassBuilderIntercepterExtension"/>
+        <expressionCodegenExtension implementation="com.ivianuu.debuglog.MyExpressionCodegenExtension"/>
+        <syntheticResolveExtension implementation="com.ivianuu.debuglog.MySyntheticResolveExtension"/>
+        <completionInformationProvider implementation="com.ivianuu.debuglog.MyCompletionInformationProvider"/>
+        <storageComponentContainerContributor
+                implementation="com.ivianuu.debuglog.MyStorageComponentContainerContributor"/>
+        <kotlinIndicesHelperExtension
+                implementation="com.ivianuu.debuglog.MyIndicesHelperExtension"/>
+    </extensions>
+
+</idea-plugin>

@@ -1,5 +1,0 @@
-rootProject.name = 'debuglog'
-include 'gradle-plugin'
-include 'kotlin-plugin'
-include 'sample'
-

@@ -24,6 +24,8 @@ out/
 .gradle/
 build/
 
+.sandbox/
+
 # Signing files
 .signing/
 
