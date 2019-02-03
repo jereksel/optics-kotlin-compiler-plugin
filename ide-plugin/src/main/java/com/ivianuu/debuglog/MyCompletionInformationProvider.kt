@@ -10,7 +10,7 @@ class MyCompletionInformationProvider : CompletionInformationProvider {
 
         //if (descriptor !is MySimpleFunctionDescriptor) return null
 
-        if (descriptor !is MyMemberExtension) return null
+        if (descriptor !is MyMemberFunctionDescriptor) return null
 
         return null
     }

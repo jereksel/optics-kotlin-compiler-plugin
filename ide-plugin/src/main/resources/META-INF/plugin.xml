@@ -28,6 +28,10 @@
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <packageFragmentProviderExtension
+                implementation="com.ivianuu.debuglog.EnhancedSyntheticResolvingPackageFragmentProviderExtension"/>
+
+        <completionExtension implementation="com.ivianuu.debuglog.MyKotlinCompletionExtension"/>
         <packageFragmentProviderExtension implementation="com.ivianuu.debuglog.MyPackageFragmentProviderExtension"/>
         <classBuilderFactoryInterceptorExtension
                 implementation="com.ivianuu.debuglog.MyClassBuilderIntercepterExtension"/>

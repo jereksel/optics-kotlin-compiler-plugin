@@ -4,13 +4,7 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.codegen.ImplementationBodyCodegen
 import org.jetbrains.kotlin.codegen.StackValue
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
-import org.jetbrains.kotlin.descriptors.SimpleFunctionDescriptor
-import org.jetbrains.kotlin.idea.codeInsight.collectSyntheticStaticMembersAndConstructors
-import org.jetbrains.kotlin.idea.refactoring.getContainingScope
-import org.jetbrains.kotlin.resolve.calls.callUtil.getReceiverExpression
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
-import org.jetbrains.kotlin.resolve.calls.resolvedCallUtil.getImplicitReceivers
-import org.jetbrains.kotlin.resolve.scopes.utils.getImplicitReceiversHierarchy
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
@@ -22,6 +16,51 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
     var messageCollector: MessageCollector? = null
 
+    override fun generateClassSyntheticParts(codegen: ImplementationBodyCodegen) {
+        super.generateClassSyntheticParts(codegen)
+
+        println("generate class synthetic parts ${codegen} ${codegen.descriptor}")
+
+        /*val delegates = codegen.myClass.superTypeListEntries
+            .filterIsInstance<KtDelegatedSuperTypeEntry>()
+            .mapNotNull { it.delegateExpression }
+            .mapNotNull { CodegenUtil.getDelegatePropertyIfAny(it, codegen.descriptor, codegen.bindingContext) }
+            .forEach {
+                println("got delegate property desc -> $it")
+            }*/
+
+        /*val function = SimpleFunctionDescriptorImpl.create(codegen.descriptor,
+            Annotations.EMPTY, Name.identifier("testFunction"),
+            CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+            .initialize(
+                null,
+                codegen.descriptor.thisAsReceiverParameter,
+                emptyList(),
+                emptyList(),
+                codegen.descriptor.builtIns.unitType,
+                Modality.FINAL,
+                Visibilities.PUBLIC
+            )
+
+        codegen.functionCodegen.generateMethod()
+
+        codegen.functionCodegen.generateMethod(
+            JvmDeclarationOrigin.NO_ORIGIN, function,
+            FunctionGenerationStrategy.FunctionDefault(
+
+            )
+        )*/
+    }
+
+    override fun applyProperty(
+        receiver: StackValue,
+        resolvedCall: ResolvedCall<*>,
+        c: ExpressionCodegenExtension.Context
+    ): StackValue? {
+        println("apply property resulting ${resolvedCall.resultingDescriptor} ${resolvedCall.resultingDescriptor.name}")
+        return super.applyProperty(receiver, resolvedCall, c)
+    }
+
     override fun applyFunction(
         receiver: StackValue,
         resolvedCall: ResolvedCall<*>,
@@ -31,7 +70,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
         println("apply function resulting $resultingDescriptor ${resultingDescriptor.name}")
 
-        if (resultingDescriptor !is MyMemberExtension) return null
+        if (resultingDescriptor !is MyMemberFunctionDescriptor) return null
 
         println("is my member extension ${resultingDescriptor.name}")
 

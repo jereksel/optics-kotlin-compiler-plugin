@@ -1,7 +1,8 @@
 package com.ivianuu.debuglog
 
 import com.intellij.psi.PsiElement
-import jdk.internal.org.objectweb.asm.Opcodes.*
+import jdk.internal.org.objectweb.asm.Opcodes.ACC_PUBLIC
+import jdk.internal.org.objectweb.asm.Opcodes.ACC_SYNTHETIC
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.codegen.ClassBuilder
 import org.jetbrains.kotlin.codegen.DelegatingClassBuilder
@@ -33,7 +34,6 @@ class MyClassBuilder(
         interfaces: Array<out String>
     ) {
         super.defineClass(origin, version, access, name, signature, superName, interfaces)
-
         currentClassName = name
     }
 
@@ -50,7 +50,14 @@ class MyClassBuilder(
 
         return if (name.startsWith(DELEGATE_PREFIX)) {
             println("is delegate")
-            super.newField(origin, ACC_PRIVATE or ACC_SYNTHETIC, name, desc, signature, value)
+            val delegateField = super.newField(origin, ACC_PUBLIC or ACC_SYNTHETIC, name, desc, signature, value)
+
+            super.newField(
+                origin,
+                ACC_PUBLIC, name.replace("\$\$", ""), desc, signature, value
+            )
+
+            delegateField
         } else {
             println("is non delegate")
             super.newField(origin, access, name, desc, signature, value)
