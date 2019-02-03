@@ -109,6 +109,8 @@ class MySyntheticResolveExtension : EnhancedSyntheticResolveExtension {
     ) {
         super.generateSyntheticMethods(thisDescriptor, name, bindingContext, fromSupertypes, result)
 
+        println("generate synthetic methods $thisDescriptor")
+
         if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
             return
         }
