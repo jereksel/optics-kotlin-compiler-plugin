@@ -26,7 +26,8 @@ class MyCommandLineProcessor : CommandLineProcessor {
         CliOption(
             optionName = "debugLogAnnotation", valueDescription = "<fqname>",
             description = "fully qualified name of the annotation(s) to use as debug-log",
-            required = true, allowMultipleOccurrences = true
+            required = true,
+            allowMultipleOccurrences = true
         )
     )
 

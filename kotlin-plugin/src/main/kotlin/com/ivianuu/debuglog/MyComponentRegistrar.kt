@@ -6,9 +6,7 @@ import org.jetbrains.kotlin.codegen.extensions.ClassBuilderInterceptorExtension
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.extensions.StorageComponentContainerContributor
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
-import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 
 @AutoService(ComponentRegistrar::class)
 class MyComponentRegistrar : ComponentRegistrar {
@@ -21,38 +19,14 @@ class MyComponentRegistrar : ComponentRegistrar {
             return
         }
 
-        // todo can't resolve cliconfigurationskey
-        /* val messageCollector = configuration.get(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY,
-                MessageCollector.NONE)*/
-
-        PackageFragmentProviderExtension.registerExtension(project,
-                  MyPackageFragmentProviderExtension().apply {
-                      this.messageCollector = messageCollector
-                  }
-        )
-
-        ExpressionCodegenExtension.registerExtension(project,
-            MyExpressionCodegenExtension().apply {
-                this.messageCollector = messageCollector
-            }
-        )
-
-        SyntheticResolveExtension.registerExtension(project, MySyntheticResolveExtension().apply {
-            this.messageCollector = messageCollector
-        })
+        ExpressionCodegenExtension.registerExtension(project, MyExpressionCodegenExtension())
+        SyntheticResolveExtension.registerExtension(project, MySyntheticResolveExtension())
 
         ClassBuilderInterceptorExtension.registerExtension(
             project,
-            MyClassBuilderIntercepterExtension().apply {
-                this.messageCollector = messageCollector
-                //debugLogAnnotations = configuration[KEY_ANNOTATIONS] ?: emptyList()
-            }
+            MyClassBuilderIntercepterExtension()
         )
 
-        StorageComponentContainerContributor.registerExtension(
-            project,
-            MyStorageComponentContainerContributor()
-        )
     }
 }
 

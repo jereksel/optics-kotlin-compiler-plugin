@@ -7,7 +7,7 @@ plugins {
 
 gradlePlugin {
     plugins {
-        create("myPlugin") {
+        create("debuglog") {
             id = "com.ivianuu.debuglog"
             implementationClass = "com.ivianuu.debuglog.MyGradlePlugin"
         }

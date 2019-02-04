@@ -24,16 +24,10 @@
     <depends>org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
-        <packageFragmentProviderExtension
-                implementation="com.ivianuu.debuglog.EnhancedSyntheticResolvingPackageFragmentProviderExtension"/>
-
-        <packageFragmentProviderExtension implementation="com.ivianuu.debuglog.MyPackageFragmentProviderExtension"/>
         <classBuilderFactoryInterceptorExtension
                 implementation="com.ivianuu.debuglog.MyClassBuilderIntercepterExtension"/>
         <expressionCodegenExtension implementation="com.ivianuu.debuglog.MyExpressionCodegenExtension"/>
         <syntheticResolveExtension implementation="com.ivianuu.debuglog.MySyntheticResolveExtension"/>
-        <storageComponentContainerContributor
-                implementation="com.ivianuu.debuglog.MyStorageComponentContainerContributor"/>
     </extensions>
 
 </idea-plugin>
