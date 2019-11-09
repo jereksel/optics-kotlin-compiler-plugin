@@ -5,11 +5,11 @@ object Build {
 object Versions {
     const val autoService = "1.0-rc4"
 
-    const val intellijIdea = "183.5429.30"
-    const val intellijGradlePlugin = "0.4.2"
+    const val intellijIdea = "2019.2.4"
+    const val intellijGradlePlugin = "0.4.11"
 
-    const val kotlin = "1.3.20"
-    const val kotlinIdeaPlugin = "1.3.20-release-IJ2018.3-1"
+    const val kotlin = "1.3.50"
+    const val kotlinIdeaPlugin = "1.3.50-release-IJ2019.2-1"
 
     const val mavenGradlePlugin = "2.1"
 

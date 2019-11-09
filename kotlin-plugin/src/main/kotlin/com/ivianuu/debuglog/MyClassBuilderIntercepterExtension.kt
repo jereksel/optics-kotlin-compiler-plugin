@@ -1,6 +1,7 @@
 package com.ivianuu.debuglog
 
 import com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.ClassBuilder
 import org.jetbrains.kotlin.codegen.ClassBuilderFactory
 import org.jetbrains.kotlin.codegen.DelegatingClassBuilder

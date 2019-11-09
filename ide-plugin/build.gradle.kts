@@ -7,7 +7,7 @@ plugins {
 intellij {
     updateSinceUntilBuild = false
     version = Versions.intellijIdea
-    setPlugins(Deps.kotlinIdeaPlugin)
+    setPlugins("java", Deps.kotlinIdeaPlugin)
 }
 
 dependencies {

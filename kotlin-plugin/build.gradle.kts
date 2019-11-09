@@ -12,12 +12,13 @@ plugins {
 // todo find a better way
 intellij {
     version = Versions.intellijIdea
-    setPlugins(Deps.kotlinIdeaPlugin)
+    setPlugins("java", Deps.kotlinIdeaPlugin)
 }
 
 dependencies {
     implementation(Deps.kotlinStdLib)
     compileOnly(Deps.autoService)
+//    compileOnly("org.intellij:openapi:7.0.3")
     kapt(Deps.autoService)
 }
 
