@@ -1,20 +1,25 @@
 package com.ivianuu.debuglog
 
+import com.ivianuu.debuglog.OpticsConst.LENS_CLASS_NAME
 import com.ivianuu.debuglog.OpticsConst.OPTICS_CLASS_NAME
 import com.ivianuu.debuglog.OpticsConst.annotationClass
+import com.ivianuu.debuglog.OpticsConst.lensClass
 import org.jetbrains.kotlin.backend.common.descriptors.explicitParameters
 import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.context.ClassContext
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
-import org.jetbrains.kotlin.descriptors.ClassDescriptor
-import org.jetbrains.kotlin.descriptors.ClassKind
-import org.jetbrains.kotlin.descriptors.FunctionDescriptor
-import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.descriptors.*
+import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.ClassDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.TypeParameterDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.DescriptorFactory
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
+import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOriginKind
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
@@ -72,7 +77,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     codegen.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, OPTICS_CLASS_NAME, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
     codegenForCreator.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, OPTICS_CLASS_NAME, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
 
-    classBuilderForCreator.newField(JvmDeclarationOrigin.NO_ORIGIN, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC, "INSTANCE", creatorAsmType.descriptor, null, null)
+    generateObjectBoilerplate(codegenForCreator, creatorClass, creatorAsmType, classBuilderForCreator)
 
     val function1 = codegen.descriptor.builtIns.getFunction(1)
 
@@ -110,9 +115,34 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
       codegenForCreator.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
       codegenForGetter.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
 
-//      classBuilderForGetter.newField(JvmDeclarationOrigin.NO_ORIGIN, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC, "INSTANCE", parameterGetterType.descriptor, null, null)
+      val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
+          CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
 
-//      codegenForGetter.functionCodegen.generateMeth
+      val genericType = descriptor.module.findClassAcrossModuleDependencies(ClassId.topLevel(lensClass))?.defaultType!!
+
+      val value = ValueParameterDescriptorImpl(
+          containingDeclaration = f,
+          original = null,
+          index = 0,
+          annotations = Annotations.EMPTY,
+          name = Name.identifier("a"),
+          outType = genericType,
+          declaresDefaultValue = false,
+          isCrossinline = false,
+          isNoinline = false,
+          varargElementType = null,
+          source = SourceElement.NO_SOURCE
+      )
+
+      f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), listOf(value), genericType, Modality.FINAL,
+          Visibilities.PUBLIC)
+
+      f.write(codegenForGetter) {
+        v.aconst(null)
+        v.areturn(Type.getType("Larrow/optics/PLens;"))
+      }
+
+      codegenForGetter.functionCodegen.generateBridges(f)
 
       classBuilderForGetter.done()
 
@@ -260,7 +290,41 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     }*/
 
   //Generates private constructor and INSTANCE field
-  private fun generateObjectBoilerplate(codegen: ImplementationBodyCodegen, creatorClass: ClassDescriptor, creatorAsmType: Type) {
+  private fun generateObjectBoilerplate(codegen: ImplementationBodyCodegen, creatorClass: ClassDescriptor, creatorAsmType: Type, classBuilderForCreator: ClassBuilder) {
+    writeCreatorConstructor(codegen, creatorClass, creatorAsmType)
+    writeClassConstructor(codegen, creatorClass, creatorAsmType)
+    classBuilderForCreator.newField(JvmDeclarationOrigin.NO_ORIGIN, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC, "INSTANCE", creatorAsmType.descriptor, null, null)
+  }
+
+  /**
+   *   static <clinit>()V
+       L0
+       LINENUMBER 3 L0
+       NEW com/ivianuu/debuglog/MyTest
+       DUP
+       INVOKESPECIAL com/ivianuu/debuglog/MyTest.<init> ()V
+       ASTORE 0
+       ALOAD 0
+       PUTSTATIC com/ivianuu/debuglog/MyTest.INSTANCE : Lcom/ivianuu/debuglog/MyTest;
+       RETURN
+       MAXSTACK = 2
+       MAXLOCALS = 1
+   */
+  private fun writeClassConstructor(codegen: ImplementationBodyCodegen, creatorClass: ClassDescriptor, creatorAsmType: Type) {
+
+    val functionDescriptor = SimpleFunctionDescriptorImpl.create(creatorClass, Annotations.EMPTY, Name.identifier("<clinit>"),
+        CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+
+    functionDescriptor.initialize(null, creatorClass.thisAsReceiverParameter, emptyList(), emptyList(), creatorClass.builtIns.unitType, Modality.FINAL,
+        Visibilities.PRIVATE)
+
+    functionDescriptor.write(codegen) {
+      v.anew(creatorAsmType)
+      v.dup()
+      v.invokespecial(creatorAsmType.internalName, "<init>", "()V", false)
+      v.putstatic(creatorAsmType.internalName, "INSTANCE", creatorAsmType.descriptor)
+      v.areturn(Type.VOID_TYPE)
+    }
 
   }
 
@@ -275,12 +339,10 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
         }
   }
 
-  private fun FunctionDescriptor.write(codegen: ImplementationBodyCodegen, code: ExpressionCodegen.() -> Unit) {
+  private inline fun FunctionDescriptor.write(codegen: ImplementationBodyCodegen, crossinline code: ExpressionCodegen.() -> Unit) {
     val declarationOrigin = JvmDeclarationOrigin(JvmDeclarationOriginKind.OTHER, null, this)
     codegen.functionCodegen.generateMethod(declarationOrigin, this, object : FunctionGenerationStrategy.CodegenBased(codegen.state) {
-      override fun doGenerateBody(e: ExpressionCodegen, signature: JvmMethodSignature) = with(e) {
-        e.code()
-      }
+      override fun doGenerateBody(e: ExpressionCodegen, signature: JvmMethodSignature) = e.code()
     })
   }
 

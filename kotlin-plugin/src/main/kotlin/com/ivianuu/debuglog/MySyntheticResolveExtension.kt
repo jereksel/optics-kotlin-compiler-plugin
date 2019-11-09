@@ -87,7 +87,7 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                         false,
                         CallableMemberDescriptor.Kind.SYNTHESIZED,
                         null,
-                        SourceElement.NO_SOURCE
+                        parameter.source
                     )
 
                     val genericType = ctx.moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType ?: return
