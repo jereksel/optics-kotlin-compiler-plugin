@@ -1,317 +1,195 @@
 package com.ivianuu.debuglog
 
+import com.ivianuu.debuglog.OpticsConst.OPTICS_CLASS_NAME
+import org.jetbrains.kotlin.backend.common.descriptors.explicitParameters
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.descriptors.impl.ClassDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.PropertyDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.PropertyGetterDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.*
+import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.BindingContext
-import org.jetbrains.kotlin.resolve.DescriptorFactory
-import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
-import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
 import org.jetbrains.kotlin.resolve.lazy.LazyClassContext
 import org.jetbrains.kotlin.resolve.lazy.declarations.ClassMemberDeclarationProvider
-import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
+import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
+import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
 import org.jetbrains.kotlin.types.KotlinType
-import java.util.*
+import org.jetbrains.kotlin.types.KotlinTypeFactory
+import org.jetbrains.kotlin.types.TypeProjectionImpl
+import org.jetbrains.kotlin.types.Variance
+import org.jetbrains.kotlin.utils.Printer
+import java.util.ArrayList
 
-/**
- * @author Manuel Wrage (IVIanuu)
- */
 class MySyntheticResolveExtension : SyntheticResolveExtension {
 
-    override fun getSyntheticFunctionNames(thisDescriptor: ClassDescriptor): List<Name> {
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
+    private val annotation = OpticsConst.annotationClass
+    private val lens = OpticsConst.lensClass
+
+    override fun getSyntheticNestedClassNames(thisDescriptor: ClassDescriptor): List<Name> {
+        if (!thisDescriptor.annotations.hasAnnotation(annotation)) {
             return emptyList()
         }
 
-        return listOf(Name.identifier("variable"), Name.identifier("function"), Name.identifier("MyInternalTest"))
-    }
-    override fun generateSyntheticProperties(
-            thisDescriptor: ClassDescriptor,
-            name: Name,
-            bindingContext: BindingContext,
-            fromSupertypes: ArrayList<PropertyDescriptor>,
-            result: MutableSet<PropertyDescriptor>
-    ) {
-        super.generateSyntheticProperties(thisDescriptor, name, bindingContext, fromSupertypes, result)
-
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return
-        }
-
-        if (name.asString() == "variable") {
-            val (a) =  propertyDescriptor(
-                    thisDescriptor,
-                    name.asString(),
-                    thisDescriptor.builtIns.intType,
-                    source = thisDescriptor.source,
-                    isVar = false,
-                    visibility = Visibilities.PUBLIC
-            )
-            result += a
-        }
-
-    }
-
-    override fun generateSyntheticMethods(
-            thisDescriptor: ClassDescriptor,
-            name: Name,
-            bindingContext: BindingContext,
-            fromSupertypes: List<SimpleFunctionDescriptor>,
-            result: MutableCollection<SimpleFunctionDescriptor>
-    ) {
-        super.generateSyntheticMethods(thisDescriptor, name, bindingContext, fromSupertypes, result)
-
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return
-        }
-
-        if (name.asString() == "function") {
-
-            val methodDescriptor = SimpleFunctionDescriptorImpl.create(
-                    thisDescriptor,
-                    Annotations.EMPTY, name,
-                    CallableMemberDescriptor.Kind.SYNTHESIZED, thisDescriptor.source
-            )
-                    .initialize(
-                            null,
-                            thisDescriptor.thisAsReceiverParameter,
-                            emptyList(),
-                            emptyList(),
-                            thisDescriptor.builtIns.intType,
-                            Modality.FINAL,
-                            Visibilities.PUBLIC
-                    )
-
-            result += methodDescriptor
-
-        }
-
+        return listOf(Name.identifier(OPTICS_CLASS_NAME))
     }
 
     override fun generateSyntheticClasses(
-            thisDescriptor: ClassDescriptor,
-            name: Name,
-            ctx: LazyClassContext,
-            declarationProvider: ClassMemberDeclarationProvider,
-            result: MutableSet<ClassDescriptor>
-    ) {
-        super.generateSyntheticClasses(thisDescriptor, name, ctx, declarationProvider, result)
-
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return
-        }
-
-        if (name.asString() == "MyInternalTest") {
-            val c = thisDescriptor.module.findClassAcrossModuleDependencies(ClassId.topLevel(FqName("com.jereksel.TestInterface")))?.defaultType!!
-            val testClass = ClassDescriptorImpl(
-                    thisDescriptor,
-                    name,
-                    Modality.FINAL,
-                    ClassKind.CLASS,
-                    listOf(c),
-                    thisDescriptor.source,
-                    false,
-                    ctx.storageManager
-            )
-
-            testClass.initialize(
-                    MemberScope.Empty,
-                    emptySet(),
-                    DescriptorFactory.createPrimaryConstructorForObject(testClass, testClass.source)
-            )
-
-            result += testClass
-        }
-    }
-
-}
-
-/*class SimpleSyntheticPropertyDescriptor(
-        owner: ClassDescriptor,
-        name: String,
-        type: KotlinType,
-        source: SourceElement,
-        isVar: Boolean = false,
-        visibility: Visibility = Visibilities.PRIVATE
-) : PropertyDescriptorImpl(
-        owner,
-        null,
-        Annotations.EMPTY,
-        Modality.FINAL,
-        visibility,
-        isVar,
-        Name.identifier(name),
-        CallableMemberDescriptor.Kind.SYNTHESIZED,
-        owner.source,
-        false, false, false, false, false, false
-) {
-
-    private val _getter = PropertyGetterDescriptorImpl(
-            this,
-            Annotations.EMPTY,
-            Modality.FINAL,
-            visibility,
-            false,
-            false,
-            false,
-            CallableMemberDescriptor.Kind.SYNTHESIZED,
-            null,
-            source
-    )
-
-    init {
-        _getter.initialize(type)
-        super.initialize(_getter, null)
-        super.setType(type, emptyList(), owner.thisAsReceiverParameter, null)
-    }
-}*/
-
-/*
-class MySyntheticResolveExtension : SyntheticResolveExtension {
-
-    override fun getSyntheticNestedClassNames(thisDescriptor: ClassDescriptor): List<Name> {
-//        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-//        }
-
-//        return emptyList()
-        return emptyList()
-    }
-
-
-
-    override fun getSyntheticFunctionNames(thisDescriptor: ClassDescriptor): List<Name> {
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return emptyList()
-        }
-
-//        return listOf(Name.identifier("testFunction"), Name.identifier("variable"))
-        return listOf(Name.identifier("testFunction"), Name.identifier("abc"))
-    }
-
-    override fun getSyntheticCompanionObjectNameIfNeeded(thisDescriptor: ClassDescriptor): Name? {
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return null
-        }
-        return SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT
-    }
-
-    override fun generateSyntheticMethods(
         thisDescriptor: ClassDescriptor,
         name: Name,
-        bindingContext: BindingContext,
-        fromSupertypes: List<SimpleFunctionDescriptor>,
-        result: MutableCollection<SimpleFunctionDescriptor>
+        ctx: LazyClassContext,
+        declarationProvider: ClassMemberDeclarationProvider,
+        result: MutableSet<ClassDescriptor>
     ) {
-        super.generateSyntheticMethods(thisDescriptor, name, bindingContext, fromSupertypes, result)
-
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
+        if (!thisDescriptor.annotations.hasAnnotation(annotation)) {
             return
         }
 
-        if (name.asString() == "testFunction") {
+        if (name.asString() == OPTICS_CLASS_NAME) {
 
-            val methodDescriptor = SimpleFunctionDescriptorImpl.create(
+            val opticsObject = ClassDescriptorImpl(
                 thisDescriptor,
-                Annotations.EMPTY, name,
-                CallableMemberDescriptor.Kind.SYNTHESIZED, thisDescriptor.source
+                name,
+                Modality.FINAL,
+                ClassKind.OBJECT,
+                emptyList(),
+                thisDescriptor.source,
+                false,
+                ctx.storageManager
             )
-                .initialize(
-                    null,
-                    thisDescriptor.thisAsReceiverParameter,
-                    emptyList(),
-                    emptyList(),
-                    thisDescriptor.builtIns.intType,
+
+            val functions: List<SimpleFunctionDescriptorImpl> = emptyList()
+
+            val parameters = thisDescriptor.unsubstitutedPrimaryConstructor?.explicitParameters ?: return
+
+            val properties: List<PropertyDescriptorImpl> = parameters.map { parameter ->
+
+                PropertyDescriptorImpl.create(
+                    opticsObject,
+                    Annotations.EMPTY,
                     Modality.FINAL,
-                    Visibilities.PUBLIC
+                    Visibilities.PUBLIC,
+                    false,
+                    parameter.name,
+                    CallableMemberDescriptor.Kind.SYNTHESIZED,
+                    parameter.source,
+                    false, false, false, false, false, false
+                ).apply {
+
+                    val getter = PropertyGetterDescriptorImpl(
+                        this,
+                        Annotations.EMPTY,
+                        Modality.FINAL,
+                        visibility,
+                        false,
+                        false,
+                        false,
+                        CallableMemberDescriptor.Kind.SYNTHESIZED,
+                        null,
+                        SourceElement.NO_SOURCE
+                    )
+
+                    val genericType = ctx.moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType ?: return
+
+                    val typeParameterDescriptor = TypeParameterDescriptorImpl.createWithDefaultBound(
+                        this,
+                        Annotations.EMPTY,
+                        false,
+                        Variance.INVARIANT,
+                        Name.identifier("A"),
+                        0
+                    )
+
+                    val left = KotlinTypeFactory.simpleType(
+                        genericType,
+                        arguments = listOf(
+                            TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                            TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                            TypeProjectionImpl(thisDescriptor.defaultType),
+                            TypeProjectionImpl(thisDescriptor.defaultType)
+                        )
+                    )
+
+                    val right = KotlinTypeFactory.simpleType(
+                        genericType,
+                        arguments = listOf(
+                            TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                            TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                            TypeProjectionImpl(parameter.type),
+                            TypeProjectionImpl(parameter.type)
+                        )
+                    )
+
+                    val extensionReceiver = ExtensionReceiver(this, left, null)
+                    val receiverParameterDescriptor =
+                        ReceiverParameterDescriptorImpl(this, extensionReceiver, Annotations.EMPTY)
+
+                    getter.initialize(left)
+                    initialize(getter, null)
+                    setType(
+                        right,
+                        listOf(typeParameterDescriptor),
+                        null,
+                        receiverParameterDescriptor
+                    )
+                }
+
+            }
+
+            val memberScope = object: MemberScopeImpl() {
+
+                override fun getContributedFunctions(
+                    name: Name,
+                    location: LookupLocation
+                ): Collection<SimpleFunctionDescriptor> {
+                    return functions.filter { it.name == name }
+                }
+
+                override fun getContributedVariables(
+                    name: Name,
+                    location: LookupLocation
+                ): Collection<PropertyDescriptor> {
+                    return properties.filter { it.name == name }
+                }
+
+                override fun getContributedDescriptors(
+                    kindFilter: DescriptorKindFilter,
+                    nameFilter: (Name) -> Boolean
+                ): Collection<DeclarationDescriptor> {
+                    return (functions + properties)
+                        .filter { kindFilter.accepts(it) && nameFilter(it.name) }
+                }
+
+                override fun printScopeStructure(p: Printer) {
+                    p.println(this::class.java.simpleName)
+                }
+
+            }
+
+            result += opticsObject.apply {
+                initialize(
+                    memberScope,
+                    setOf(),
+                    null
                 )
-
-            result += methodDescriptor
-
-        }
-
-        if (name.asString() == "variable") {
-
-            val (_, a) = propertyDescriptor(
-                    thisDescriptor,
-                    name.asString(),
-                    thisDescriptor.builtIns.intType,
-                    source = thisDescriptor.source,
-                    isVar = false,
-                    visibility = Visibilities.PUBLIC
-            )
-
+            }
 
         }
 
-//        if (name.asString() == "testFunction1") {
-////
-//            result += SimpleFunctionDescriptorImpl.create(
-//                    thisDescriptor.companionObjectDescriptor!!.containingDeclaration,
-//                    Annotations.EMPTY, name,
-//                    CallableMemberDescriptor.Kind.SYNTHESIZED, thisDescriptor.source
-//            )
-//                    .initialize(
-//                            null,
-//                            thisDescriptor.companionObjectDescriptor!!.thisAsReceiverParameter,
-//                            emptyList(),
-//                            emptyList(),
-//                            thisDescriptor.builtIns.intType,
-//                            Modality.FINAL,
-//                            Visibilities.PUBLIC
-//                    )
-//
-//        }
-
+        super.generateSyntheticClasses(thisDescriptor, name, ctx, declarationProvider, result)
     }
 
-    override fun generateSyntheticProperties(
-            thisDescriptor: ClassDescriptor,
-            name: Name,
-            bindingContext: BindingContext,
-            fromSupertypes: ArrayList<PropertyDescriptor>,
-            result: MutableSet<PropertyDescriptor>
-    ) {
-        super.generateSyntheticProperties(thisDescriptor, name, bindingContext, fromSupertypes, result)
-
-        if (!thisDescriptor.annotations.hasAnnotation(FqName("com.ivianuu.myapplication.Synthetics"))) {
-            return
-        }
-
-        if (name.asString() == "abc") {
-            val (a) = propertyDescriptor(
-                    thisDescriptor,
-                    name.asString(),
-                    thisDescriptor.builtIns.intType,
-                    source = thisDescriptor.source,
-                    isVar = false,
-                    visibility = Visibilities.PUBLIC
-            )
-            result += a
-        }
-
-    }
-
-}
-
-*/
-
-fun propertyDescriptor(
+    private fun propertyDescriptor(
         owner: ClassDescriptor,
         name: String,
         type: KotlinType,
         source: SourceElement,
         isVar: Boolean,
         visibility: Visibility
-): Pair<PropertyDescriptorImpl, PropertyGetterDescriptorImpl> {
+    ): Pair<PropertyDescriptorImpl, PropertyGetterDescriptorImpl> {
 
-    val propertyDescriptor = PropertyDescriptorImpl.create(
+        val propertyDescriptor = PropertyDescriptorImpl.create(
             owner,
             Annotations.EMPTY,
             Modality.FINAL,
@@ -321,9 +199,9 @@ fun propertyDescriptor(
             CallableMemberDescriptor.Kind.SYNTHESIZED,
             owner.source,
             false, false, false, false, false, false
-    )
+        )
 
-    val getter = PropertyGetterDescriptorImpl(
+        val getter = PropertyGetterDescriptorImpl(
             propertyDescriptor,
             Annotations.EMPTY,
             Modality.FINAL,
@@ -334,54 +212,14 @@ fun propertyDescriptor(
             CallableMemberDescriptor.Kind.SYNTHESIZED,
             null,
             source
-    )
+        )
 
-    getter.initialize(type)
-    propertyDescriptor.initialize(getter, null)
-    propertyDescriptor.setType(type, emptyList(), owner.thisAsReceiverParameter, null)
+        getter.initialize(type)
+        propertyDescriptor.initialize(getter, null)
+        propertyDescriptor.setType(type, emptyList(), owner.thisAsReceiverParameter, null)
 
-    return propertyDescriptor to getter
+        return propertyDescriptor to getter
+
+    }
 
 }
-
-/*
-
-class SimpleSyntheticPropertyDescriptor(
-        owner: ClassDescriptor,
-        name: String,
-        type: KotlinType,
-        source: SourceElement,
-        isVar: Boolean = false,
-        visibility: Visibility = Visibilities.PRIVATE
-) : PropertyDescriptorImpl(
-        owner,
-        null,
-        Annotations.EMPTY,
-        Modality.FINAL,
-        visibility,
-        isVar,
-        Name.identifier(name),
-        CallableMemberDescriptor.Kind.SYNTHESIZED,
-        owner.source,
-        false, false, false, false, false, false
-) {
-
-    private val _getter = PropertyGetterDescriptorImpl(
-            this,
-            Annotations.EMPTY,
-            Modality.FINAL,
-            visibility,
-            false,
-            false,
-            false,
-            CallableMemberDescriptor.Kind.SYNTHESIZED,
-            null,
-            source
-    )
-
-    init {
-        _getter.initialize(type)
-        super.initialize(_getter, null, FieldDescriptorImpl(Annotations.EMPTY, this), FieldDescriptorImpl(Annotations.EMPTY, this))
-        super.setType(type, emptyList(), owner.thisAsReceiverParameter, owner.thisAsReceiverParameter)
-    }
-}*/

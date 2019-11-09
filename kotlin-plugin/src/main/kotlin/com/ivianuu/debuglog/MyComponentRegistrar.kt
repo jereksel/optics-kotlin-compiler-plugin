@@ -6,6 +6,7 @@ import org.jetbrains.kotlin.codegen.extensions.ClassBuilderInterceptorExtension
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.idea.core.extension.KotlinIndicesHelperExtension
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
 
 @AutoService(ComponentRegistrar::class)
@@ -21,11 +22,6 @@ class MyComponentRegistrar : ComponentRegistrar {
 
         ExpressionCodegenExtension.registerExtension(project, MyExpressionCodegenExtension())
         SyntheticResolveExtension.registerExtension(project, MySyntheticResolveExtension())
-
-        ClassBuilderInterceptorExtension.registerExtension(
-            project,
-            MyClassBuilderIntercepterExtension()
-        )
 
     }
 }
