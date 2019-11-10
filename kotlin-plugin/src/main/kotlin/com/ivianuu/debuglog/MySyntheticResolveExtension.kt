@@ -9,6 +9,7 @@ import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.DescriptorFactory
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
 import org.jetbrains.kotlin.resolve.lazy.LazyClassContext
 import org.jetbrains.kotlin.resolve.lazy.declarations.ClassMemberDeclarationProvider
@@ -69,7 +70,7 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                     opticsObject,
                     Annotations.EMPTY,
                     Modality.FINAL,
-                    Visibilities.PUBLIC,
+                    Visibilities.DEFAULT_VISIBILITY,
                     false,
                     parameter.name,
                     CallableMemberDescriptor.Kind.SYNTHESIZED,
@@ -130,7 +131,7 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                     setType(
                         right,
                         listOf(typeParameterDescriptor),
-                        null,
+                        opticsObject.thisAsReceiverParameter,
                         receiverParameterDescriptor
                     )
                 }
@@ -171,7 +172,7 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                 initialize(
                     memberScope,
                     setOf(),
-                    null
+                    DescriptorFactory.createPrimaryConstructorForObject(opticsObject, opticsObject.source)
                 )
             }
 

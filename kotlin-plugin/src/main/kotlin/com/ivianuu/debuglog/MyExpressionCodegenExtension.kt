@@ -1,10 +1,10 @@
 package com.ivianuu.debuglog
 
-import com.ivianuu.debuglog.OpticsConst.LENS_CLASS_NAME
 import com.ivianuu.debuglog.OpticsConst.OPTICS_CLASS_NAME
 import com.ivianuu.debuglog.OpticsConst.annotationClass
 import com.ivianuu.debuglog.OpticsConst.lensClass
 import org.jetbrains.kotlin.backend.common.descriptors.explicitParameters
+import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.context.ClassContext
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
@@ -12,7 +12,6 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.ClassDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.TypeParameterDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
@@ -25,8 +24,11 @@ import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOriginKind
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
+import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
+import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
+import java.util.*
 
 /**
  * @author Manuel Wrage (IVIanuu)
@@ -48,9 +50,6 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
     val containerAsmType = codegen.typeMapper.mapType(descriptor.defaultType)
     val creatorAsmType = Type.getObjectType("${containerAsmType.internalName}\$${OPTICS_CLASS_NAME}")
-
-    // From ParcelableCodegenExtension
-//        val c = descriptor.module.findClassAcrossModuleDependencies(ClassId.topLevel(FqName("com.jereksel.TestInterface")))?.defaultType!!
 
     val creatorClass = ClassDescriptorImpl(
         descriptor, Name.identifier(OPTICS_CLASS_NAME), Modality.FINAL, ClassKind.OBJECT, emptyList(),
@@ -79,215 +78,332 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
     generateObjectBoilerplate(codegenForCreator, creatorClass, creatorAsmType, classBuilderForCreator)
 
+    descriptor.unsubstitutedPrimaryConstructor!!.explicitParameters.forEach { parameter ->
+      generateGetFunctionClass(parameter, creatorAsmType, creatorClass, codegenForCreator, codegen)
+      generateSetFunctionClass(parameter, creatorAsmType, creatorClass, codegenForCreator, codegen)
+      generateGetExtensionMethod(parameter, creatorAsmType, creatorClass, codegenForCreator)
+    }
+
+    classBuilderForCreator.done()
+
+  }
+
+  private fun generateGetFunctionClass(parameter: ParameterDescriptor, creatorAsmType: Type, creatorClass: ClassDescriptorImpl, codegenForCreator: ImplementationBodyCodegen, codegen: ImplementationBodyCodegen) {
+
     val function1 = codegen.descriptor.builtIns.getFunction(1)
 
-    descriptor.unsubstitutedPrimaryConstructor!!.explicitParameters.forEach { parameter ->
+    val parameterGetterName = "Get${parameter.name.asString().capitalize()}"
 
-      val parameterGetterName = "Get${parameter.name.asString().capitalize()}"
+    val parameterGetterType = Type.getObjectType("${creatorAsmType.internalName}\$${parameterGetterName}")
 
-      val parameterGetterType = Type.getObjectType("${creatorAsmType.internalName}\$${parameterGetterName}")
+    val getterClass = ClassDescriptorImpl(
+        creatorClass, Name.identifier(parameterGetterName), Modality.FINAL, ClassKind.CLASS, listOf(function1.defaultType),
+        creatorClass.source, false, LockBasedStorageManager.NO_LOCKS)
 
-      val getterClass = ClassDescriptorImpl(
-          creatorClass, Name.identifier(parameterGetterName), Modality.FINAL, ClassKind.CLASS, listOf(function1.defaultType),
-          creatorClass.source, false, LockBasedStorageManager.NO_LOCKS)
+    getterClass.initialize(
+        MemberScope.Empty, emptySet(),
+        DescriptorFactory.createPrimaryConstructorForObject(getterClass, getterClass.source)
+    )
 
-      getterClass.initialize(
-          MemberScope.Empty, emptySet(),
-          DescriptorFactory.createPrimaryConstructorForObject(getterClass, getterClass.source)
-      )
+    val classBuilderForGetter = codegenForCreator.state.factory.newVisitor(
+        JvmDeclarationOrigin(JvmDeclarationOriginKind.SYNTHETIC, null, getterClass),
+        parameterGetterType,
+        codegenForCreator.myClass.containingKtFile)
 
-      val classBuilderForGetter = codegenForCreator.state.factory.newVisitor(
-          JvmDeclarationOrigin(JvmDeclarationOriginKind.SYNTHETIC, null, getterClass),
-          parameterGetterType,
-          codegenForCreator.myClass.containingKtFile)
+    val classContextForGetter = ClassContext(
+        codegenForCreator.typeMapper, getterClass, OwnerKind.IMPLEMENTATION, codegenForCreator.context.parentContext, null)
+    val codegenForGetter = ImplementationBodyCodegen(
+        codegenForCreator.myClass, classContextForGetter, classBuilderForGetter, codegenForCreator.state, codegenForCreator.parentCodegen, false)
 
-      val classContextForGetter = ClassContext(
-          codegenForCreator.typeMapper, getterClass, OwnerKind.IMPLEMENTATION, codegenForCreator.context.parentContext, null)
-      val codegenForGetter = ImplementationBodyCodegen(
-          codegenForCreator.myClass, classContextForGetter, classBuilderForGetter, codegenForCreator.state, codegenForCreator.parentCodegen, false)
+    classBuilderForGetter.defineClass(null, Opcodes.V1_6, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
+        parameterGetterType.internalName, null, "java/lang/Object",
+        arrayOf(function1.defaultType.asmType(codegen.typeMapper).internalName)
+    )
 
-      classBuilderForGetter.defineClass(null, Opcodes.V1_6, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
-          parameterGetterType.internalName, null, "java/lang/Object",
-          arrayOf(function1.defaultType.asmType(codegen.typeMapper).internalName)
-      )
+    codegen.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    codegenForCreator.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    codegenForGetter.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
 
-      codegen.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
-      codegenForCreator.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
-      codegenForGetter.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    writeCreatorConstructor(codegenForGetter, getterClass, parameterGetterType)
 
-      val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
-          CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+    generateGetterFunction1(parameter, getterClass, codegenForGetter)
 
-      val genericType = descriptor.module.findClassAcrossModuleDependencies(ClassId.topLevel(lensClass))?.defaultType!!
+    //FIXME: Metadata is empty
+    writeSyntheticClassMetadata(classBuilderForGetter, codegenForGetter.state)
 
-      val value = ValueParameterDescriptorImpl(
+    classBuilderForGetter.done()
+  }
+
+  private fun generateGetterFunction1(parameter: ParameterDescriptor, getterClass: ClassDescriptorImpl, codegenForGetter: ImplementationBodyCodegen) {
+    generateTypeSafeGet(parameter, getterClass, codegenForGetter)
+    generateAnyGet(parameter, getterClass, codegenForGetter)
+  }
+
+  private fun generateTypeSafeGet(parameter: ParameterDescriptor, getterClass: ClassDescriptor, codegenForGetter: ImplementationBodyCodegen) {
+    val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
+        CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+
+    val value = ValueParameterDescriptorImpl(
+        containingDeclaration = f,
+        original = null,
+        index = 0,
+        annotations = Annotations.EMPTY,
+        name = Name.identifier("var1"),
+        outType = (parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType,
+        declaresDefaultValue = false,
+        isCrossinline = false,
+        isNoinline = false,
+        varargElementType = null,
+        source = SourceElement.NO_SOURCE
+    )
+
+    f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), listOf(value),
+        parameter.type.box(getterClass.builtIns, getterClass.module), Modality.FINAL, Visibilities.PUBLIC)
+
+    val parameterType = parameter.type.asmType(codegenForGetter.typeMapper)
+    val classType = (parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType.asmType(codegenForGetter.typeMapper)
+
+    f.write(codegenForGetter) {
+      v.load(1, classType)
+      v.invokevirtual(classType.descriptor, "get${parameter.name.asString().capitalize()}", "()${parameterType.descriptor}", false)
+      v.boxIfRequired(parameterType)
+      v.areturn(classType)
+    }
+  }
+
+  private fun generateAnyGet(parameter: ParameterDescriptor, getterClass: ClassDescriptor, codegenForGetter: ImplementationBodyCodegen) {
+    val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
+        CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+
+    val value = ValueParameterDescriptorImpl(
+        containingDeclaration = f,
+        original = null,
+        index = 0,
+        annotations = Annotations.EMPTY,
+        name = Name.identifier("var1"),
+        outType = parameter.builtIns.anyType,
+        declaresDefaultValue = false,
+        isCrossinline = false,
+        isNoinline = false,
+        varargElementType = null,
+        source = SourceElement.NO_SOURCE
+    )
+
+    f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), listOf(value), parameter.builtIns.anyType, Modality.FINAL,
+        Visibilities.PUBLIC)
+
+    val getterType = getterClass.defaultType.asmType(codegenForGetter.typeMapper)
+    val parameterType = parameter.type.asmType(codegenForGetter.typeMapper)
+    val boxedParameterType = AsmUtil.boxType(parameterType)
+    val classType = (parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType.asmType(codegenForGetter.typeMapper)
+
+    f.write(codegenForGetter) {
+      v.load(0, getterType)
+      v.load(1, classType)
+      v.checkcast(classType)
+      v.invokevirtual(getterType.descriptor, "invoke", "(${classType.descriptor})${boxedParameterType.descriptor}", false)
+      v.areturn(classType)
+    }
+  }
+
+  private fun generateSetFunctionClass(parameter: ParameterDescriptor, creatorAsmType: Type, creatorClass: ClassDescriptorImpl, codegenForCreator: ImplementationBodyCodegen, codegen: ImplementationBodyCodegen) {
+
+    val function2 = codegen.descriptor.builtIns.getFunction(2)
+
+    val parameterGetterName = "Set${parameter.name.asString().capitalize()}"
+
+    val parameterGetterType = Type.getObjectType("${creatorAsmType.internalName}\$${parameterGetterName}")
+
+    val getterClass = ClassDescriptorImpl(
+        creatorClass, Name.identifier(parameterGetterName), Modality.FINAL, ClassKind.CLASS, listOf(function2.defaultType),
+        creatorClass.source, false, LockBasedStorageManager.NO_LOCKS)
+
+    getterClass.initialize(
+        MemberScope.Empty, emptySet(),
+        DescriptorFactory.createPrimaryConstructorForObject(getterClass, getterClass.source)
+    )
+
+    val classBuilderForGetter = codegenForCreator.state.factory.newVisitor(
+        JvmDeclarationOrigin(JvmDeclarationOriginKind.SYNTHETIC, null, getterClass),
+        parameterGetterType,
+        codegenForCreator.myClass.containingKtFile)
+
+    val classContextForGetter = ClassContext(
+        codegenForCreator.typeMapper, getterClass, OwnerKind.IMPLEMENTATION, codegenForCreator.context.parentContext, null)
+    val codegenForGetter = ImplementationBodyCodegen(
+        codegenForCreator.myClass, classContextForGetter, classBuilderForGetter, codegenForCreator.state, codegenForCreator.parentCodegen, false)
+
+    classBuilderForGetter.defineClass(null, Opcodes.V1_6, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
+        parameterGetterType.internalName, null, "java/lang/Object",
+        arrayOf(function2.defaultType.asmType(codegen.typeMapper).internalName)
+    )
+
+    codegen.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    codegenForCreator.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    codegenForGetter.v.visitInnerClass(parameterGetterType.internalName, creatorAsmType.internalName, parameterGetterName, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+
+    writeCreatorConstructor(codegenForGetter, getterClass, parameterGetterType)
+
+    generateSetterFunction2(parameter, getterClass, codegenForGetter)
+
+    //FIXME: Metadata is empty
+    writeSyntheticClassMetadata(classBuilderForGetter, codegenForGetter.state)
+
+    classBuilderForGetter.done()
+
+  }
+
+  private fun generateSetterFunction2(parameter: ParameterDescriptor, getterClass: ClassDescriptorImpl, codegenForGetter: ImplementationBodyCodegen) {
+    generateTypeSafeSet(parameter, getterClass, codegenForGetter)
+    generateAnySet(parameter, getterClass, codegenForGetter)
+  }
+
+  private fun generateTypeSafeSet(parameter: ParameterDescriptor, getterClass: ClassDescriptor, codegenForGetter: ImplementationBodyCodegen) {
+
+    val constructor = parameter.containingDeclaration as ConstructorDescriptor
+
+    val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
+        CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
+
+    val parameters = listOf((parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType, parameter.type).mapIndexed { index: Int, kotlinType: KotlinType ->
+      ValueParameterDescriptorImpl(
           containingDeclaration = f,
           original = null,
-          index = 0,
+          index = index,
           annotations = Annotations.EMPTY,
-          name = Name.identifier("a"),
-          outType = genericType,
+          name = Name.identifier("var${index}"),
+          outType = kotlinType,
           declaresDefaultValue = false,
           isCrossinline = false,
           isNoinline = false,
           varargElementType = null,
           source = SourceElement.NO_SOURCE
       )
-
-      f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), listOf(value), genericType, Modality.FINAL,
-          Visibilities.PUBLIC)
-
-      f.write(codegenForGetter) {
-        v.aconst(null)
-        v.areturn(Type.getType("Larrow/optics/PLens;"))
-      }
-
-      codegenForGetter.functionCodegen.generateBridges(f)
-
-      classBuilderForGetter.done()
-
     }
 
+    val classKotlinType = (parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType
 
-//            writeCreatorConstructor(codegenForCreator, creatorClass, creatorAsmType)
-//            writeNewArrayMethod(codegenForCreator, parcelableClass, creatorClass, parcelerObject)
-//            writeCreateFromParcel(codegenForCreator, parcelableClass, creatorClass, parcelClassType, parcelAsmType, parcelerObject, properties)
+    f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), parameters, classKotlinType, Modality.FINAL,
+        Visibilities.PUBLIC)
 
-//            writeSyntheticClassMetadata(classBuilderForCreator, codegen.state)
+    val getterType = getterClass.defaultType.asmType(codegenForGetter.typeMapper)
+    val parameterType = parameter.type.asmType(codegenForGetter.typeMapper)
+    val boxedParameterType = AsmUtil.boxType(parameterType)
+    val classType = (parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType.asmType(codegenForGetter.typeMapper)
 
-//            codegenForCreator.generate()
+    var mask = 0
 
-//            codegenForCreator.generate()
+    val descriptor = (listOf((parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType) + constructor.explicitParameters.map { it.type } + constructor.builtIns.intType + constructor.builtIns.anyType)
+        .joinToString(separator = "", prefix = "(", postfix = ")${classType.descriptor}") { it.asmType(codegenForGetter.typeMapper).descriptor }
 
-//            codegenForCreator.generate()
+    //FIXME: Data class with single parameter - it has different copy method
+    f.write(codegenForGetter) {
+      v.load(1, classType)
 
-    classBuilderForCreator.done()
+      constructor.explicitParameters.forEachIndexed { index, constructorParameter ->
+        if (constructorParameter == parameter) {
+          v.load(2, parameterType)
+        } else {
+          mask += 2 shl index
+          v.aconst(null)
+        }
+      }
+
+      v.iconst(mask)
+      v.aconst(null)
+      v.invokestatic(classType.internalName, "copy\$default", descriptor, false)
+      v.areturn(classType)
+    }
 
   }
 
-/*    override fun generateClassSyntheticParts(codegen: ImplementationBodyCodegen) {
-        super.generateClassSyntheticParts(codegen)
+  private fun generateAnySet(parameter: ParameterDescriptor, getterClass: ClassDescriptor, codegenForGetter: ImplementationBodyCodegen) {
 
-        val descriptor = codegen.descriptor
+    val f = SimpleFunctionDescriptorImpl.create(getterClass, Annotations.EMPTY, Name.identifier("invoke"),
+        CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
 
-        if (descriptor.annotations.hasAnnotation(
-                FqName("com.ivianuu.myapplication.Synthetics")
-            )
-        ) {
+    val parameters = listOf(0, 1).map { index ->
+      ValueParameterDescriptorImpl(
+          containingDeclaration = f,
+          original = null,
+          index = index,
+          annotations = Annotations.EMPTY,
+          name = Name.identifier("var${index}"),
+          outType = parameter.builtIns.anyType,
+          declaresDefaultValue = false,
+          isCrossinline = false,
+          isNoinline = false,
+          varargElementType = null,
+          source = SourceElement.NO_SOURCE
+      )
+    }
 
-            run {
+    f.initialize(null, getterClass.thisAsReceiverParameter, emptyList(), parameters, parameter.builtIns.anyType, Modality.FINAL,
+        Visibilities.PUBLIC)
 
-                val name = Name.identifier("testFunction")
+    val getterType = getterClass.defaultType.asmType(codegenForGetter.typeMapper)
+    val parameterType = Type.getType(parameter.type.asmType(codegenForGetter.typeMapper).descriptor)
+    val boxedParameterType = AsmUtil.boxType(parameterType)
+    val classType = Type.getType((parameter.containingDeclaration.containingDeclaration as ClassDescriptor).defaultType.asmType(codegenForGetter.typeMapper).descriptor)
 
-                val methodDescriptor = SimpleFunctionDescriptorImpl.create(
-                        descriptor,
-                        Annotations.EMPTY, name,
-                        CallableMemberDescriptor.Kind.SYNTHESIZED, descriptor.source
-                )
-                        .initialize(
-                                null,
-                                descriptor.thisAsReceiverParameter,
-                                emptyList(),
-                                emptyList(),
-                                descriptor.builtIns.intType,
-                                Modality.FINAL,
-                                Visibilities.PUBLIC
-                        )
-
-                codegen.generateMethod(methodDescriptor) { _, _ ->
-                    iconst(1)
-                    areturn(INT_TYPE)
-                }
-
-            }
-
-            run {
-
-                val name = Name.identifier("getAbc")
-
-                val methodDescriptor = SimpleFunctionDescriptorImpl.create(
-                        descriptor,
-                        Annotations.EMPTY, name,
-                        CallableMemberDescriptor.Kind.SYNTHESIZED, descriptor.source
-                )
-                        .initialize(
-                                null,
-                                descriptor.thisAsReceiverParameter,
-                                emptyList(),
-                                emptyList(),
-                                descriptor.builtIns.intType,
-                                Modality.FINAL,
-                                Visibilities.PUBLIC
-                        )
-
-                codegen.generateMethod(methodDescriptor) { _, _ ->
-                    iconst(1)
-                    areturn(INT_TYPE)
-                }
-
-            }
-
-            val containerAsmType = codegen.typeMapper.mapType(descriptor.defaultType)
-            val creatorAsmType = Type.getObjectType(containerAsmType.internalName + "\$MyInternalTest")
-
-            val parcelableClass = descriptor
-
-            // From ParcelableCodegenExtension
+    f.write(codegenForGetter) {
+      v.load(0, getterType)
+      v.load(1, classType)
+      v.checkcast(classType)
+      v.load(2, boxedParameterType)
+      v.checkcast(boxedParameterType)
+      v.invokevirtual(getterType.descriptor, "invoke", "(${classType.descriptor}${boxedParameterType.descriptor})${classType.descriptor}", false)
+      v.areturn(classType)
+    }
 
 
-            val c = descriptor.module.findClassAcrossModuleDependencies(ClassId.topLevel(FqName("com.jereksel.TestInterface")))?.defaultType!!
+  }
 
-            val creatorClass = ClassDescriptorImpl(
-                    parcelableClass, Name.identifier("MyInternalTest"), Modality.FINAL, ClassKind.CLASS, listOf(c),
-                    parcelableClass.source, false, LockBasedStorageManager.NO_LOCKS)
+  private fun generateGetExtensionMethod(parameter: ParameterDescriptor, creatorAsmType: Type, creatorClass: ClassDescriptorImpl, codegenForCreator: ImplementationBodyCodegen) {
 
-            creatorClass.initialize(
-                    MemberScope.Empty, emptySet(),
-                    DescriptorFactory.createPrimaryConstructorForObject(creatorClass, creatorClass.source))
+    val methodName = "get${parameter.name.asString().capitalize()}"
 
-            val classBuilderForCreator = codegen.state.factory.newVisitor(
-                    JvmDeclarationOrigin(JvmDeclarationOriginKind.SYNTHETIC, null, creatorClass),
-                    Type.getObjectType(creatorAsmType.internalName),
-                    codegen.myClass.containingKtFile)
+    val getType = Type.getType("${creatorAsmType.descriptor.dropLast(1)}\$Get${parameter.name.asString().capitalize()};")
+    val setType = Type.getType("${creatorAsmType.descriptor.dropLast(1)}\$Set${parameter.name.asString().capitalize()};")
 
-            val classContextForCreator = ClassContext(
-                    codegen.typeMapper, creatorClass, OwnerKind.IMPLEMENTATION, codegen.context.parentContext, null)
-            val codegenForCreator = ImplementationBodyCodegen(
-                    codegen.myClass, classContextForCreator, classBuilderForCreator, codegen.state, codegen.parentCodegen, false)
+    val genericType = creatorClass.module.findClassAcrossModuleDependencies(ClassId.topLevel(lensClass))?.defaultType!!
 
-            classBuilderForCreator.defineClass(null, Opcodes.V1_6, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
-                    creatorAsmType.internalName, null, "java/lang/Object",
-                    arrayOf("com/jereksel/TestInterface"))
-//                    emptyArray())
+    val f = SimpleFunctionDescriptorImpl.create(creatorClass, Annotations.EMPTY,
+        Name.identifier(methodName), CallableMemberDescriptor.Kind.SYNTHESIZED, SourceElement.NO_SOURCE)
 
-            codegen.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, "MyInternalTest", Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
-            codegenForCreator.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, "MyInternalTest", Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+    val param = ValueParameterDescriptorImpl(
+        containingDeclaration = f,
+        original = null,
+        index = 0,
+        annotations = Annotations.EMPTY,
+        name = Name.identifier("var1"),
+        outType = genericType,
+        declaresDefaultValue = false,
+        isCrossinline = false,
+        isNoinline = false,
+        varargElementType = null,
+        source = SourceElement.NO_SOURCE
+    )
 
-            run {
-                val clz = ImplementationBodyCodegen::class.java
-                val m = clz.getDeclaredMethod("generateDefaultImplsIfNeeded")
-                m.isAccessible = true
-                m.invoke(codegenForCreator)
-            }
+    f.initialize(null, null, emptyList(), listOf(param), genericType, Modality.FINAL,
+        Visibilities.PUBLIC)
 
-//            writeCreatorConstructor(codegenForCreator, creatorClass, creatorAsmType)
-//            writeNewArrayMethod(codegenForCreator, parcelableClass, creatorClass, parcelerObject)
-//            writeCreateFromParcel(codegenForCreator, parcelableClass, creatorClass, parcelClassType, parcelAsmType, parcelerObject, properties)
+    val getterType = genericType.asmType(codegenForCreator.typeMapper)
 
-//            writeSyntheticClassMetadata(classBuilderForCreator, codegen.state)
+    f.write(codegenForCreator) {
+      v.anew(getType)
+      v.dup()
+      v.invokespecial(getType.internalName, "<init>", "()V", false)
 
-//            codegenForCreator.generate()
+      v.anew(setType)
+      v.dup()
+      v.invokespecial(setType.internalName, "<init>", "()V", false)
 
-//            codegenForCreator.generate()
+      v.aconst(null)
+      v.areturn(getterType)
+    }
 
-//            codegenForCreator.generate()
-
-            classBuilderForCreator.done()
-
-            return
-        }
-
-    }*/
+  }
 
   //Generates private constructor and INSTANCE field
   private fun generateObjectBoilerplate(codegen: ImplementationBodyCodegen, creatorClass: ClassDescriptor, creatorAsmType: Type, classBuilderForCreator: ClassBuilder) {
@@ -339,11 +455,30 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
         }
   }
 
-  private inline fun FunctionDescriptor.write(codegen: ImplementationBodyCodegen, crossinline code: ExpressionCodegen.() -> Unit) {
+  private fun FunctionDescriptor.write(codegen: ImplementationBodyCodegen, code: ExpressionCodegen.() -> Unit) {
     val declarationOrigin = JvmDeclarationOrigin(JvmDeclarationOriginKind.OTHER, null, this)
     codegen.functionCodegen.generateMethod(declarationOrigin, this, object : FunctionGenerationStrategy.CodegenBased(codegen.state) {
       override fun doGenerateBody(e: ExpressionCodegen, signature: JvmMethodSignature) = e.code()
     })
   }
 
+  private fun InstructionAdapter.boxIfRequired(parameterType: Type) {
+
+    if (parameterType == Type.INT_TYPE) {
+      invokestatic("java/lang/Integer", "valueOf", "(I)Ljava/lang/Integer", false)
+    }
+
+  }
+
 }
+
+private fun KotlinType.box(builtIns: KotlinBuiltIns, moduleDescriptor: ModuleDescriptor): KotlinType {
+
+  if (this == builtIns.intType) {
+    return moduleDescriptor.findClassAcrossModuleDependencies(ClassId.fromString("java/lang/Integer"))?.defaultType!!
+  }
+
+  return this
+
+}
+
