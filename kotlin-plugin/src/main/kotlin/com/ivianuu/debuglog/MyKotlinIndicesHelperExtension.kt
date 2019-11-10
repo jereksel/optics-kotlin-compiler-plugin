@@ -33,7 +33,7 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
         lookupLocation: LookupLocation) {
 
         //Return collection with multiple elements
-        val receiverType = receiverTypes.singleOrNull() ?: return
+       val receiverType = receiverTypes.singleOrNull() ?: return
 
         val location = (lookupLocation as? KotlinLookupLocation)?.element ?: return
 

@@ -27,6 +27,7 @@
         <expressionCodegenExtension implementation="com.ivianuu.debuglog.MyExpressionCodegenExtension"/>
         <syntheticResolveExtension implementation="com.ivianuu.debuglog.MySyntheticResolveExtension"/>
         <kotlinIndicesHelperExtension implementation="com.ivianuu.debuglog.MyKotlinIndicesHelperExtension"/>
+        <packageFragmentProviderExtension implementation="com.ivianuu.debuglog.MyPackageFragmentProviderExtension"/>
     </extensions>
 
 </idea-plugin>

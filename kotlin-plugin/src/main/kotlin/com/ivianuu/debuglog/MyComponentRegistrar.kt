@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.idea.core.extension.KotlinIndicesHelperExtension
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
+import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 
 @AutoService(ComponentRegistrar::class)
 class MyComponentRegistrar : ComponentRegistrar {
@@ -22,6 +23,7 @@ class MyComponentRegistrar : ComponentRegistrar {
 
         ExpressionCodegenExtension.registerExtension(project, MyExpressionCodegenExtension())
         SyntheticResolveExtension.registerExtension(project, MySyntheticResolveExtension())
+        PackageFragmentProviderExtension.registerExtension(project, MyPackageFragmentProviderExtension())
 
     }
 }
