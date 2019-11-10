@@ -81,6 +81,9 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     descriptor.unsubstitutedPrimaryConstructor!!.explicitParameters.forEach { parameter ->
       generateGetFunctionClass(parameter, creatorAsmType, creatorClass, codegenForCreator, codegen)
       generateSetFunctionClass(parameter, creatorAsmType, creatorClass, codegenForCreator, codegen)
+    }
+
+    descriptor.unsubstitutedPrimaryConstructor!!.explicitParameters.forEach { parameter ->
       generateGetExtensionMethod(parameter, creatorAsmType, creatorClass, codegenForCreator)
     }
 
@@ -165,7 +168,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
     f.write(codegenForGetter) {
       v.load(1, classType)
-      v.invokevirtual(classType.descriptor, "get${parameter.name.asString().capitalize()}", "()${parameterType.descriptor}", false)
+      v.invokevirtual(classType.internalName, "get${parameter.name.asString().capitalize()}", "()${parameterType.descriptor}", false)
       v.boxIfRequired(parameterType)
       v.areturn(classType)
     }
@@ -201,7 +204,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
       v.load(0, getterType)
       v.load(1, classType)
       v.checkcast(classType)
-      v.invokevirtual(getterType.descriptor, "invoke", "(${classType.descriptor})${boxedParameterType.descriptor}", false)
+      v.invokevirtual(getterType.internalName, "invoke", "(${classType.descriptor})${boxedParameterType.descriptor}", false)
       v.areturn(classType)
     }
   }
@@ -304,7 +307,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
         if (constructorParameter == parameter) {
           v.load(2, parameterType)
         } else {
-          mask += 2 shl index
+          mask += 1 shl index
           v.aconst(null)
         }
       }
@@ -352,7 +355,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
       v.checkcast(classType)
       v.load(2, boxedParameterType)
       v.checkcast(boxedParameterType)
-      v.invokevirtual(getterType.descriptor, "invoke", "(${classType.descriptor}${boxedParameterType.descriptor})${classType.descriptor}", false)
+      v.invokevirtual(getterType.internalName, "invoke", "(${classType.descriptor}${boxedParameterType.descriptor})${classType.descriptor}", false)
       v.areturn(classType)
     }
 
@@ -391,6 +394,11 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     val getterType = genericType.asmType(codegenForCreator.typeMapper)
 
     f.write(codegenForCreator) {
+
+      v.load(1, Type.getType("Larrow/optics/PLens;"))
+
+      v.getstatic("arrow/optics/PLens", "Companion", "Larrow/optics/PLens\$Companion;")
+
       v.anew(getType)
       v.dup()
       v.invokespecial(getType.internalName, "<init>", "()V", false)
@@ -399,7 +407,10 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
       v.dup()
       v.invokespecial(setType.internalName, "<init>", "()V", false)
 
-      v.aconst(null)
+      v.invokevirtual("arrow/optics/PLens\$Companion", "invoke", "(Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)Larrow/optics/PLens;", false)
+
+      v.invokeinterface("arrow/optics/PLens", "compose", "(Larrow/optics/PLens;)Larrow/optics/PLens;")
+
       v.areturn(getterType)
     }
 
