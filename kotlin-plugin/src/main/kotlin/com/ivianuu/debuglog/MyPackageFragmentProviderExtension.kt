@@ -87,20 +87,28 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 //          println(fileManager)
 //          return emptyList()
 
+          val originalFqName = fqName
+
+          if (fqName.isRoot || fqName.parent().isRoot) {
+            return emptyList()
+          }
+
           if (!fqName.isSubpackageOf(topLevel)) {
             return emptyList()
           }
 
+          val fqName = FqName.fromSegments(fqName.pathSegments().drop(1).map { it.asString() })
+
           var className = fqName.shortName()
           var tempFqName = fqName.parent()
 
-          var segments = mutableListOf<String>()
+          val segments = mutableListOf<String>()
 
           val segmentsMap = mutableMapOf<FqName, Name>()
 
 //          val segments = mutableListOf<String>()
 
-          while (tempFqName != topLevel) {
+          while (!tempFqName.isRoot) {
             segmentsMap += tempFqName to className
             className = Name.identifier("${tempFqName.shortName().asString()}\$${className.asString()}")
             tempFqName = tempFqName.parent()
@@ -115,13 +123,13 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 
           val pckg = FqName.fromSegments(segments)
 
-          val clz = segmentsMap.mapNotNull { (p, className) ->
+          val clz = segmentsMap.mapNotNull { (p, c) ->
             val memberScope = module.getPackage(p).memberScope
 
-            memberScope.getContributedClassifier(className, NoLookupLocation.FROM_BACKEND)
+            memberScope.getContributedClassifier(c, NoLookupLocation.FROM_BACKEND)
                 as? DeserializedClassDescriptor
           }
-              .firstOrNull() ?: return emptyList()
+//              .firstOrNull() ?: return emptyList()
 
           println(clz)
 
@@ -138,7 +146,7 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
           return listOf(
               object: PackageFragmentDescriptorImpl(
                   module,
-                  tempFqName
+                  originalFqName
               ) {
                 override fun getMemberScope(): MemberScope {
                   val t = this

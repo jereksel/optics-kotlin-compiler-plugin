@@ -7,24 +7,30 @@ import org.jetbrains.kotlin.backend.common.descriptors.explicitParameters
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.codegen.*
 import org.jetbrains.kotlin.codegen.context.ClassContext
+import org.jetbrains.kotlin.codegen.context.PackageContext
 import org.jetbrains.kotlin.codegen.extensions.ExpressionCodegenExtension
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.ClassDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
 import org.jetbrains.kotlin.descriptors.impl.ValueParameterDescriptorImpl
+import org.jetbrains.kotlin.js.resolve.diagnostics.findPsi
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.psi.KtPureClassOrObject
 import org.jetbrains.kotlin.resolve.DescriptorFactory
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.descriptorUtil.builtIns
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin
+import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOrigin.Companion.NO_ORIGIN
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.JvmDeclarationOriginKind
 import org.jetbrains.kotlin.resolve.jvm.jvmSignature.JvmMethodSignature
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
+import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.typeUtil.isSubtypeOf
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
@@ -39,11 +45,79 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     if (resolvedCall.candidateDescriptor !is OpticsPropertyDescriptor) {
       return null
     }
+
+    val descriptor = resolvedCall.getReceiverDeclarationDescriptor() as? ClassDescriptor ?: return null
+
+    val containerAsmType = (c.codegen.getContext().classOrPackageParentContext as PackageContext).implementationOwnerClassType!!
+    val creatorAsmType = Type.getObjectType("${containerAsmType.internalName}\$${OPTICS_CLASS_NAME}")
+
+    val creatorClass = ClassDescriptorImpl(
+        descriptor, Name.identifier(OPTICS_CLASS_NAME), Modality.FINAL, ClassKind.OBJECT, emptyList(),
+        descriptor.source, false, LockBasedStorageManager.NO_LOCKS)
+
+    creatorClass.initialize(
+        MemberScope.Empty, emptySet(),
+        DescriptorFactory.createPrimaryConstructorForObject(creatorClass, creatorClass.source))
+
+    val classBuilderForCreator = c.codegen.state.factory.newVisitor(
+        JvmDeclarationOrigin(JvmDeclarationOriginKind.SYNTHETIC, null, creatorClass),
+        Type.getObjectType(creatorAsmType.internalName),
+        (c.codegen.getContext().classOrPackageParentContext as PackageContext).sourceFile!!.containingFile)
+//        c.codegen.myClass.containingKtFile)
+//
+    val classContextForCreator = ClassContext(
+        c.typeMapper, creatorClass, OwnerKind.IMPLEMENTATION, c.codegen.context.parentContext, null)
+
+//    classContextForCreator.intoFunction()
+
+//    val codegenForCreator = ImplementationBodyCodegen(
+//        creatorClass.findPsi() as KtPureClassOrObject, classContextForCreator, classBuilderForCreator, c.codegen.state, c.codegen.parentCodegen, false)
+//
+    classBuilderForCreator.defineClass(null, Opcodes.V1_6, Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
+        creatorAsmType.internalName, null, "java/lang/Object",
+        emptyArray())
+
+    val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "test", "()V", null, null)
+
+    visitor.visitCode()
+
+    val v = InstructionAdapter(visitor)
+    v.aconst(123)
+
+    FunctionCodegen.endVisit(visitor, "test")
+
+
+//
+//    codegenForCreator.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, OPTICS_CLASS_NAME, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
+//
+    classBuilderForCreator.done()
+//
     return StackValue.constant(42)
 //    return null
 //    return super.applyProperty(receiver, resolvedCall, c)
   }
 
+  private fun ResolvedCall<*>.getReceiverDeclarationDescriptor(): ClassifierDescriptor? {
+    val fromDeclarationSite = resultingDescriptor.extensionReceiverParameter?.type?.constructor?.declarationDescriptor
+    val fromCallSite = (extensionReceiver as ReceiverValue).type.constructor.declarationDescriptor
+
+    if (fromDeclarationSite == null && fromCallSite == null)
+      return null
+    else if (fromDeclarationSite != null && fromCallSite == null)
+      return fromDeclarationSite
+    else if (fromDeclarationSite == null && fromCallSite != null)
+      return fromCallSite
+
+    fromDeclarationSite as ClassifierDescriptor
+    fromCallSite as ClassifierDescriptor
+
+    return if (fromCallSite.defaultType.isSubtypeOf(fromDeclarationSite.defaultType))
+      fromCallSite
+    else
+      fromDeclarationSite
+  }
+
+/*
   override fun generateClassSyntheticParts(codegen: ImplementationBodyCodegen) {
     super.generateClassSyntheticParts(codegen)
 
@@ -428,7 +502,8 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
     classBuilderForCreator.newField(JvmDeclarationOrigin.NO_ORIGIN, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC, "INSTANCE", creatorAsmType.descriptor, null, null)
   }
 
-  /**
+  */
+/**
    *   static <clinit>()V
        L0
        LINENUMBER 3 L0
@@ -441,7 +516,8 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
        RETURN
        MAXSTACK = 2
        MAXLOCALS = 1
-   */
+   *//*
+
   private fun writeClassConstructor(codegen: ImplementationBodyCodegen, creatorClass: ClassDescriptor, creatorAsmType: Type) {
 
     val functionDescriptor = SimpleFunctionDescriptorImpl.create(creatorClass, Annotations.EMPTY, Name.identifier("<clinit>"),
@@ -486,6 +562,7 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
   }
 
+*/
 }
 
 private fun KotlinType.box(builtIns: KotlinBuiltIns, moduleDescriptor: ModuleDescriptor): KotlinType {
