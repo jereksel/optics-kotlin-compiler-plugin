@@ -35,8 +35,13 @@ import java.util.*
  */
 class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
-  override fun applyFunction(receiver: StackValue, resolvedCall: ResolvedCall<*>, c: ExpressionCodegenExtension.Context): StackValue? {
-    return super.applyFunction(receiver, resolvedCall, c)
+  override fun applyProperty(receiver: StackValue, resolvedCall: ResolvedCall<*>, c: ExpressionCodegenExtension.Context): StackValue? {
+    if (resolvedCall.candidateDescriptor !is OpticsPropertyDescriptor) {
+      return null
+    }
+    return StackValue.constant(42)
+//    return null
+//    return super.applyProperty(receiver, resolvedCall, c)
   }
 
   override fun generateClassSyntheticParts(codegen: ImplementationBodyCodegen) {

@@ -1,0 +1,3 @@
+package com.ivianuu.debuglog
+
+interface OpticsSyntheticFunction
