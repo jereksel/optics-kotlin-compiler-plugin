@@ -1,8 +1,6 @@
 package com.ivianuu.debuglog
 
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.psi.PsiManager
 import com.intellij.psi.search.searches.AllClassesSearch
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.asJava.classes.KtLightClassBase
@@ -12,13 +10,11 @@ import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.idea.caches.project.LibraryInfo
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.incremental.components.LookupTracker
-import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.lexer.KtTokens.DATA_KEYWORD
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.isSubpackageOf
-import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
@@ -173,7 +169,11 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
                         parameter.name,
                         CallableMemberDescriptor.Kind.SYNTHESIZED,
                         SourceElement.NO_SOURCE,
-                        false, false, false, false, false, false
+                        false, false, false, false, false, false,
+
+                        parentClass = clz.defaultType,
+                        parameterName = parameter.name,
+                        parameterClass = parameter.type
                     ).apply {
 
                       val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(
@@ -304,7 +304,7 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
       println("${it.name}")
     }
 
-    return MyPackageFragmentProvider(classes, module)
+    return MyPackageFragmentProvider(classes, module, project)
 
 //    FileTypeIndex.getFiles(KotlinFileType.INSTANCE, moduleInfo.contentScope())
 //        .asSequence()

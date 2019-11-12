@@ -1,19 +1,15 @@
 package com.ivianuu.debuglog
 
-import com.ivianuu.debuglog.OpticsConst.LENS_CLASS_NAME
+import com.intellij.openapi.project.Project
 import com.ivianuu.debuglog.OpticsConst.lensClass
 import org.jetbrains.kotlin.asJava.classes.KtLightClassBase
-import org.jetbrains.kotlin.asJava.elements.KtLightMethod
-import org.jetbrains.kotlin.asJava.elements.KtLightMethodImpl
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.idea.refactoring.fqName.getKotlinFqName
-import org.jetbrains.kotlin.idea.refactoring.isInJavaSourceRoot
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.*
 import org.jetbrains.kotlin.nj2k.postProcessing.type
-import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
@@ -26,7 +22,8 @@ import org.jetbrains.kotlin.utils.Printer
 
 class MyPackageFragmentProvider(
     private val classes: List<KtLightClassBase>,
-    private val module: ModuleDescriptor
+    private val module: ModuleDescriptor,
+    private val project: Project
 ) : PackageFragmentProvider {
 
   private val topLevel = FqName.topLevel(Name.identifier("arrowx"))
@@ -80,7 +77,11 @@ class MyPackageFragmentProvider(
                   parameter.nameAsName!!,
                   CallableMemberDescriptor.Kind.SYNTHESIZED,
                   SourceElement.NO_SOURCE,
-                  false, false, false, false, false, false
+                  false, false, false, false, false, false,
+
+                  parentClass = constructor.type()!!,
+                  parameterName = parameter.nameAsName!!,
+                  parameterClass = parameter.type()!!
               ).apply {
 
                 val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(

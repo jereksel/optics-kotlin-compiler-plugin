@@ -42,7 +42,9 @@ import java.util.*
 class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
   override fun applyProperty(receiver: StackValue, resolvedCall: ResolvedCall<*>, c: ExpressionCodegenExtension.Context): StackValue? {
-    if (resolvedCall.candidateDescriptor !is OpticsPropertyDescriptor) {
+    val candidateDescriptor = resolvedCall.candidateDescriptor
+
+    if (candidateDescriptor !is OpticsPropertyDescriptor) {
       return null
     }
 
@@ -73,20 +75,64 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 //    val codegenForCreator = ImplementationBodyCodegen(
 //        creatorClass.findPsi() as KtPureClassOrObject, classContextForCreator, classBuilderForCreator, c.codegen.state, c.codegen.parentCodegen, false)
 //
+
     classBuilderForCreator.defineClass(null, Opcodes.V1_6, Opcodes.ACC_PUBLIC or Opcodes.ACC_FINAL,
         creatorAsmType.internalName, null, "java/lang/Object",
-        emptyArray())
+        arrayOf(
+            c.typeMapper.mapTypeAsDeclaration(resolvedCall.resultingDescriptor.builtIns.getFunction(1).defaultType).internalName,
+            c.typeMapper.mapTypeAsDeclaration(resolvedCall.resultingDescriptor.builtIns.getFunction(2).defaultType).internalName
+        ))
 
-    val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC, "test", "()I", null, null)
+    run {
 
-    visitor.visitCode()
+      val classType = c.typeMapper.mapTypeAsDeclaration(candidateDescriptor.parentClass)
+      val parameterType = c.typeMapper.mapTypeAsDeclaration(candidateDescriptor.parameterClass)
+      val parameterName = candidateDescriptor.parameterName
 
-    val v = InstructionAdapter(visitor)
-    v.aconst(123)
-    v.areturn(Type.INT_TYPE)
+      val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null)
 
-    FunctionCodegen.endVisit(visitor, "test")
+      visitor.visitCode()
 
+      val v = InstructionAdapter(visitor)
+
+      v.load(1, classType)
+      v.checkcast(classType)
+      v.invokevirtual(classType.internalName, "get${parameterName.asString().capitalize()}", "()${parameterType.descriptor}", false)
+      v.areturn(classType)
+
+      FunctionCodegen.endVisit(visitor, "invoke")
+
+    }
+
+    run {
+
+      val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "invoke", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", null, null)
+
+      visitor.visitCode()
+
+      val v = InstructionAdapter(visitor)
+      v.aconst(null)
+      v.areturn(Type.getReturnType("(Larrow/optics/PLens;)Larrow/optics/PLens;"))
+
+      FunctionCodegen.endVisit(visitor, "invoke")
+
+    }
+
+    run {
+
+    }
+
+    run {
+
+    }
+
+    run {
+
+    }
+
+    run {
+
+    }
 
 //
 //    codegenForCreator.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, OPTICS_CLASS_NAME, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)

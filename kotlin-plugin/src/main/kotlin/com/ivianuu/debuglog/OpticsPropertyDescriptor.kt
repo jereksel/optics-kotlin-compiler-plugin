@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.PropertyDescriptorImpl
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.types.KotlinType
 
 class OpticsPropertyDescriptor(
     containingDeclaration: DeclarationDescriptor,
@@ -20,7 +21,11 @@ class OpticsPropertyDescriptor(
     isExpect: Boolean,
     isActual: Boolean,
     isExternal: Boolean,
-    isDelegated: Boolean
+    isDelegated: Boolean,
+
+    val parentClass: KotlinType,
+    val parameterName: Name,
+    val parameterClass: KotlinType
 ) : OpticsSyntheticFunction, PropertyDescriptorImpl(
     containingDeclaration,
     original,
