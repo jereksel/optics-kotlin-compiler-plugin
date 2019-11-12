@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.typeUtil.isSubtypeOf
+import org.jetbrains.kotlinx.serialization.compiler.backend.jvm.stackValueDefault
 import org.jetbrains.org.objectweb.asm.Opcodes
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.InstructionAdapter
@@ -106,19 +107,57 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 
     run {
 
+      val classType = c.typeMapper.mapTypeAsDeclaration(candidateDescriptor.parentClass)
+      val parameterType = c.typeMapper.mapTypeAsDeclaration(candidateDescriptor.parameterClass)
+
+      val descriptor = (listOf(candidateDescriptor.parentClass) + candidateDescriptor.constructorParameterClasses + candidateDescriptor.builtIns.intType + candidateDescriptor.builtIns.anyType)
+          .joinToString(separator = "", prefix = "(", postfix = ")${classType.descriptor}") { it.asmType(c.typeMapper).descriptor }
+
       val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "invoke", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", null, null)
 
       visitor.visitCode()
 
+      var mask = 0
+
       val v = InstructionAdapter(visitor)
+//      v.aconst(null)
+//      v.areturn(Type.getReturnType("(Larrow/optics/PLens;)Larrow/optics/PLens;"))
+
+      v.load(1, classType)
+      v.checkcast(classType)
+
+      (0 until candidateDescriptor.numberOfConstructorParams).forEach { index ->
+        if (index == candidateDescriptor.constructorParamIndex) {
+          v.load(2, parameterType)
+        } else {
+          mask += 1 shl index
+          v.aconst(null)
+        }
+        v.checkcast(c.typeMapper.mapTypeAsDeclaration(candidateDescriptor.constructorParameterClasses[index]))
+      }
+
+      v.iconst(mask)
       v.aconst(null)
-      v.areturn(Type.getReturnType("(Larrow/optics/PLens;)Larrow/optics/PLens;"))
+      v.invokestatic(classType.internalName, "copy\$default", descriptor, false)
+      v.areturn(classType)
 
       FunctionCodegen.endVisit(visitor, "invoke")
 
     }
 
     run {
+
+      val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "<init>", "()V", null, null)
+
+      val v = InstructionAdapter(visitor)
+
+      visitor.visitCode()
+
+      v.load(0, creatorAsmType)
+      v.invokespecial("java/lang/Object", "<init>", "()V", false)
+      v.areturn(Type.VOID_TYPE)
+
+      FunctionCodegen.endVisit(visitor, "constructor")
 
     }
 
@@ -138,8 +177,24 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
 //    codegenForCreator.v.visitInnerClass(creatorAsmType.internalName, containerAsmType.internalName, OPTICS_CLASS_NAME, Opcodes.ACC_PUBLIC or Opcodes.ACC_STATIC or Opcodes.ACC_FINAL)
 //
     classBuilderForCreator.done()
+
+//    c.v.aconst(null)
+
+    return OperationStackValue(Type.getType("Larrow/optics/PLens;"), null) {
+      receiver.put(it)
+      it.getstatic("arrow/optics/PLens", "Companion", "Larrow/optics/PLens\$Companion;")
+      it.anew(creatorAsmType)
+      it.dup()
+      it.invokespecial(creatorAsmType.internalName, "<init>", "()V", false)
+      it.dup()
+      it.invokevirtual("arrow/optics/PLens\$Companion", "invoke", "(Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function2;)Larrow/optics/PLens;", false)
+      it.invokeinterface("arrow/optics/PLens", "compose", "(Larrow/optics/PLens;)Larrow/optics/PLens;")
+    }
+
+//    return StackValue.LOCAL_0
+
 //
-    return StackValue.constant(42)
+//    return StackValue.constant(42)
 //    return null
 //    return super.applyProperty(receiver, resolvedCall, c)
   }

@@ -65,7 +65,7 @@ class MyPackageFragmentProvider(
 
             val functions: List<SimpleFunctionDescriptorImpl> = emptyList()
 
-            val properties = constructor.valueParameters.map { parameter ->
+            val properties = constructor.valueParameters.mapIndexed { constructorIndex, parameter ->
 
               OpticsPropertyDescriptor(
                   t,
@@ -81,7 +81,11 @@ class MyPackageFragmentProvider(
 
                   parentClass = constructor.type()!!,
                   parameterName = parameter.nameAsName!!,
-                  parameterClass = parameter.type()!!
+                  parameterClass = parameter.type()!!,
+
+                  constructorParamIndex = constructorIndex,
+                  numberOfConstructorParams = constructor.valueParameters.size,
+                  constructorParameterClasses = constructor.valueParameters.map { it.type()!! }
               ).apply {
 
                 val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(

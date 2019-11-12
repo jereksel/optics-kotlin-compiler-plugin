@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.isSubpackageOf
+import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
@@ -157,7 +158,7 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
                   )
 */
 
-                  val properties = constructor.valueParameters.map { parameter ->
+                  val properties = constructor.valueParameters.mapIndexed { constructorIndex, parameter ->
 
                     OpticsPropertyDescriptor(
                         t,
@@ -173,7 +174,11 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 
                         parentClass = clz.defaultType,
                         parameterName = parameter.name,
-                        parameterClass = parameter.type
+                        parameterClass = parameter.type,
+
+                        constructorParamIndex = constructorIndex,
+                        numberOfConstructorParams = constructor.valueParameters.size,
+                        constructorParameterClasses = constructor.valueParameters.map { it.type }
                     ).apply {
 
                       val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(

@@ -25,7 +25,11 @@ class OpticsPropertyDescriptor(
 
     val parentClass: KotlinType,
     val parameterName: Name,
-    val parameterClass: KotlinType
+    val parameterClass: KotlinType,
+
+    val constructorParameterClasses: List<KotlinType>,
+    val numberOfConstructorParams: Int,
+    val constructorParamIndex: Int
 ) : OpticsSyntheticFunction, PropertyDescriptorImpl(
     containingDeclaration,
     original,
