@@ -8,24 +8,28 @@ import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.asJava.classes.KtLightClassBase
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.PropertyGetterDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.idea.caches.project.LibraryInfo
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.incremental.components.NoLookupLocation
 import org.jetbrains.kotlin.lexer.KtTokens.DATA_KEYWORD
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.isSubpackageOf
+import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.jvm.extensions.PackageFragmentProviderExtension
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
+import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedClassDescriptor
 import org.jetbrains.kotlin.storage.StorageManager
+import org.jetbrains.kotlin.types.KotlinTypeFactory
+import org.jetbrains.kotlin.types.TypeProjectionImpl
+import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.Printer
 
 class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
@@ -45,47 +49,9 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 
     val classes = if (moduleInfo == null) {
 //      //CLI
-      val psiManager = PsiManager.getInstance(project)
-      val fileManager = VirtualFileManager.getInstance()
-
-      println()
-      println(psiManager)
-      println(fileManager)
-
-//
-//      FileTypeIndex.getFiles(KotlinFileType.INSTANCE, GlobalSearchScope.projectScope(project))
-//
-//      GlobalSearchScope.ALL
-//
-////      fileManager.
-//
-//      AllClassesSearch.search(GlobalSearchScope.allScope(project), project)
-//          .findAll()
-//          .forEach {
-//            println(it)
-//          }
-//
-//      println(psiManager)
-//      println(fileManager)
-//
-//      AllClassesSearch.search(GlobalSearchScope.allScope(project), project)
-//          .findAll()
-//          .asSequence()
-//          .filterIsInstance<KtLightClassBase>()
-//          .filter { it.kotlinOrigin?.hasModifier(DATA_KEYWORD) == true }
-//          .toList()
-
 
       return object: PackageFragmentProvider {
         override fun getPackageFragments(fqName: FqName): List<PackageFragmentDescriptor> {
-          // module.getPackage(FqName("com.github.ajalt.clikt.output")).memberScope.getContributedClassifier(Name.identifier("HelpFormatter"), NoLookupLocation.FROM_BACKEND)
-//          println()
-//          module.resolveClassByFqName()
-//          println(project)
-//          println(module)
-//          println(psiManager)
-//          println(fileManager)
-//          return emptyList()
 
           val originalFqName = fqName
 
@@ -110,7 +76,7 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 
           while (!tempFqName.isRoot) {
             segmentsMap += tempFqName to className
-            className = Name.identifier("${tempFqName.shortName().asString()}\$${className.asString()}")
+            className = Name.identifier("${tempFqName.shortName().asString()}.${className.asString()}")
             tempFqName = tempFqName.parent()
 //            className = tempFqName.shortName()
 //            seg
@@ -126,10 +92,12 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
           val clz = segmentsMap.mapNotNull { (p, c) ->
             val memberScope = module.getPackage(p).memberScope
 
-            memberScope.getContributedClassifier(c, NoLookupLocation.FROM_BACKEND)
-                as? DeserializedClassDescriptor
+            module.findClassAcrossModuleDependencies(ClassId(p, c)) as? DeserializedClassDescriptor
+//
+//            memberScope.getContributedClassifier(c, NoLookupLocation.FROM_BACKEND)
+//                as? DeserializedClassDescriptor
           }
-//              .firstOrNull() ?: return emptyList()
+              .firstOrNull() ?: return emptyList()
 
           println(clz)
 
@@ -143,6 +111,10 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
 //                it.name.asString() == className.asString()
 //              } ?: return emptyList()
 
+          val lens = module.findClassAcrossModuleDependencies(ClassId.topLevel(OpticsConst.lensClass))
+
+          val constructor = clz.unsubstitutedPrimaryConstructor!!
+
           return listOf(
               object: PackageFragmentDescriptorImpl(
                   module,
@@ -152,6 +124,7 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
                   val t = this
 
                   val functions: List<SimpleFunctionDescriptorImpl> = emptyList()
+/*
 
                   val properties = listOf(
                       OpticsPropertyDescriptor(
@@ -186,6 +159,77 @@ class MyPackageFragmentProviderExtension : PackageFragmentProviderExtension {
                       }
 
                   )
+*/
+
+                  val properties = constructor.valueParameters.map { parameter ->
+
+                    OpticsPropertyDescriptor(
+                        t,
+                        null,
+                        Annotations.EMPTY,
+                        Modality.FINAL,
+                        Visibilities.PUBLIC,
+                        false,
+                        parameter.name,
+                        CallableMemberDescriptor.Kind.SYNTHESIZED,
+                        SourceElement.NO_SOURCE,
+                        false, false, false, false, false, false
+                    ).apply {
+
+                      val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(
+                          this,
+                          Annotations.EMPTY,
+                          Modality.FINAL,
+                          visibility,
+                          false,
+                          false,
+                          false,
+                          CallableMemberDescriptor.Kind.SYNTHESIZED,
+                          null,
+                          SourceElement.NO_SOURCE
+                      ) {}
+
+                      val genericType = module.findClassAcrossModuleDependencies(ClassId.topLevel(OpticsConst.lensClass))?.defaultType!!
+
+                      val typeParameterDescriptor = TypeParameterDescriptorImpl.createWithDefaultBound(
+                          this,
+                          Annotations.EMPTY,
+                          false,
+                          Variance.INVARIANT,
+                          Name.identifier("A"),
+                          0
+                      )
+
+                      val left = KotlinTypeFactory.simpleType(
+                          genericType,
+                          arguments = listOf(
+                              TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                              TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                              TypeProjectionImpl(clz.defaultType),
+                              TypeProjectionImpl(clz.defaultType)
+                          )
+                      )
+
+                      val right = KotlinTypeFactory.simpleType(
+                          genericType,
+                          arguments = listOf(
+                              TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                              TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                              TypeProjectionImpl(parameter.type),
+                              TypeProjectionImpl(parameter.type)
+                          )
+                      )
+
+                      val extensionReceiver = ExtensionReceiver(this, left, null)
+                      val receiverParameterDescriptor =
+                          ReceiverParameterDescriptorImpl(this, extensionReceiver, Annotations.EMPTY)
+
+                      getter.initialize(left)
+                      initialize(getter, null)
+                      setType(right, listOf(typeParameterDescriptor), null, receiverParameterDescriptor)
+                    }
+
+                  }
 
                   return object: MemberScopeImpl() {
 

@@ -77,12 +77,13 @@ class MyExpressionCodegenExtension : ExpressionCodegenExtension {
         creatorAsmType.internalName, null, "java/lang/Object",
         emptyArray())
 
-    val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_PUBLIC, "test", "()V", null, null)
+    val visitor = classBuilderForCreator.newMethod(NO_ORIGIN, Opcodes.ACC_STATIC or Opcodes.ACC_PUBLIC, "test", "()I", null, null)
 
     visitor.visitCode()
 
     val v = InstructionAdapter(visitor)
     v.aconst(123)
+    v.areturn(Type.INT_TYPE)
 
     FunctionCodegen.endVisit(visitor, "test")
 

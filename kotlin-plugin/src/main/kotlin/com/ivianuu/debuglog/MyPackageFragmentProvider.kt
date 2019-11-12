@@ -1,17 +1,27 @@
 package com.ivianuu.debuglog
 
+import com.ivianuu.debuglog.OpticsConst.LENS_CLASS_NAME
+import com.ivianuu.debuglog.OpticsConst.lensClass
 import org.jetbrains.kotlin.asJava.classes.KtLightClassBase
+import org.jetbrains.kotlin.asJava.elements.KtLightMethod
+import org.jetbrains.kotlin.asJava.elements.KtLightMethodImpl
 import org.jetbrains.kotlin.descriptors.*
 import org.jetbrains.kotlin.descriptors.annotations.Annotations
-import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.PropertyGetterDescriptorImpl
-import org.jetbrains.kotlin.descriptors.impl.SimpleFunctionDescriptorImpl
+import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.idea.refactoring.fqName.getKotlinFqName
+import org.jetbrains.kotlin.idea.refactoring.isInJavaSourceRoot
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.*
+import org.jetbrains.kotlin.nj2k.postProcessing.type
+import org.jetbrains.kotlin.psi.psiUtil.containingClass
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScope
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
+import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
+import org.jetbrains.kotlin.resolve.source.toSourceElement
+import org.jetbrains.kotlin.types.KotlinTypeFactory
+import org.jetbrains.kotlin.types.TypeProjectionImpl
+import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.Printer
 
 class MyPackageFragmentProvider(
@@ -38,51 +48,97 @@ class MyPackageFragmentProvider(
       }
     }
 
-    val clz = fqNameToClass[fqName] ?: return emptyList()
+    val clz = fqNameToClass[fqName]?.kotlinOrigin ?: return emptyList()
+
+    val constructor = clz.primaryConstructor!!
+    println("Constructor: ${constructor.type()}")
 
     return listOf(
         object: PackageFragmentDescriptorImpl(
             module,
             fqName
         ) {
+
+          override fun getSource(): SourceElement {
+            return clz.toSourceElement()
+          }
+
           override fun getMemberScope(): MemberScope {
             val t = this
 
             val functions: List<SimpleFunctionDescriptorImpl> = emptyList()
 
-            val properties = listOf(
-                OpticsPropertyDescriptor(
-                    t,
-                    null,
+            val properties = constructor.valueParameters.map { parameter ->
+
+              OpticsPropertyDescriptor(
+                  t,
+                  null,
+                  Annotations.EMPTY,
+                  Modality.FINAL,
+                  Visibilities.PUBLIC,
+                  false,
+                  parameter.nameAsName!!,
+                  CallableMemberDescriptor.Kind.SYNTHESIZED,
+                  SourceElement.NO_SOURCE,
+                  false, false, false, false, false, false
+              ).apply {
+
+                val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(
+                    this,
                     Annotations.EMPTY,
                     Modality.FINAL,
-                    Visibilities.PUBLIC,
+                    visibility,
                     false,
-                    Name.identifier("myAwesomeProperty"),
+                    false,
+                    false,
                     CallableMemberDescriptor.Kind.SYNTHESIZED,
-                    SourceElement.NO_SOURCE,
-                    false, false, false, false, false, false
-                ).apply {
+                    null,
+                    SourceElement.NO_SOURCE
+                ) {}
 
-                  val getter = object: OpticsSyntheticFunction, PropertyGetterDescriptorImpl(
-                      this,
-                      Annotations.EMPTY,
-                      Modality.FINAL,
-                      visibility,
-                      false,
-                      false,
-                      false,
-                      CallableMemberDescriptor.Kind.SYNTHESIZED,
-                      null,
-                      SourceElement.NO_SOURCE
-                  ) {}
+                val genericType = module.findClassAcrossModuleDependencies(ClassId.topLevel(lensClass))?.defaultType!!
 
-                  getter.initialize(module.builtIns.intType)
-                  initialize(getter, null)
-                  setType(module.builtIns.intType, emptyList(), null, module.builtIns.string.thisAsReceiverParameter)
-                }
+                val typeParameterDescriptor = TypeParameterDescriptorImpl.createWithDefaultBound(
+                    this,
+                    Annotations.EMPTY,
+                    false,
+                    Variance.INVARIANT,
+                    Name.identifier("A"),
+                    0
+                )
 
-            )
+                println("Constructor: ${constructor.type()}")
+
+                val left = KotlinTypeFactory.simpleType(
+                    genericType,
+                    arguments = listOf(
+                        TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                        TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                        TypeProjectionImpl(constructor.type()!!),
+                        TypeProjectionImpl(constructor.type()!!)
+                    )
+                )
+
+                val right = KotlinTypeFactory.simpleType(
+                    genericType,
+                    arguments = listOf(
+                        TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                        TypeProjectionImpl(typeParameterDescriptor.defaultType),
+                        TypeProjectionImpl(parameter.type()!!),
+                        TypeProjectionImpl(parameter.type()!!)
+                    )
+                )
+
+                val extensionReceiver = ExtensionReceiver(this, left, null)
+                val receiverParameterDescriptor =
+                    ReceiverParameterDescriptorImpl(this, extensionReceiver, Annotations.EMPTY)
+
+                getter.initialize(left)
+                initialize(getter, null)
+                setType(right, listOf(typeParameterDescriptor), null, receiverParameterDescriptor)
+              }
+
+            }
 
             return object: MemberScopeImpl() {
 
@@ -129,14 +185,18 @@ class MyPackageFragmentProvider(
     return fqNameToClass
         .keys
         .filter { it.isSubpackageOf(fqName) }
-        .map { _fqName ->
+        .mapNotNull { _fqName ->
           var localFqName = _fqName
 
-          while(localFqName.parent() != fqName) {
+          while(!localFqName.isRoot && localFqName.parent() != fqName) {
             localFqName = localFqName.parent()
           }
 
-          localFqName
+          if (localFqName.isRoot) {
+            null
+          } else {
+            localFqName
+          }
 
         }
         .filter { nameFilter(it.shortName()) }
