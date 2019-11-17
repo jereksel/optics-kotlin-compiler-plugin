@@ -3,23 +3,24 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("kotlin-kapt")
-    id("org.jetbrains.intellij") version Versions.intellijGradlePlugin
     id("com.github.johnrengelman.shadow")
     id("org.gradle.maven-publish")
 }
 
-// just a dummy to access intellij and kotlin plugin apis
-// todo find a better way
-intellij {
-    version = Versions.intellijIdea
-    setPlugins("java", Deps.kotlinIdeaPlugin)
+dependencies {
+    compileOnly(Deps.kotlinStdLib)
+    compileOnly(Deps.kotlinCompilerEmbeddable)
+    compileOnly(Deps.autoService)
+    kapt(Deps.autoService)
+
+    testImplementation(Deps.joor)
+    testImplementation(Deps.arrowOptics)
+    testImplementation(Deps.kotlinCompileTesting)
+    testImplementation(Deps.kotlinTest)
 }
 
-dependencies {
-    implementation(Deps.kotlinStdLib)
-    compileOnly(Deps.autoService)
-//    compileOnly("org.intellij:openapi:7.0.3")
-    kapt(Deps.autoService)
+tasks.withType<Test> {
+    useJUnitPlatform()
 }
 
 // the following code makes sure that our kotlin-plugin is compatible with the kotlin-compiler-embeddable package
@@ -43,13 +44,13 @@ val packagesToRelocate =
 val shadowJar: ShadowJar by tasks
 
 shadowJar.apply {
-    classifier = ""
-    relocate("com.google.protobuf", "$kotlinEmbeddableRootPackage.protobuf")
+    archiveClassifier.set("")
+    relocate("$kotlinEmbeddableRootPackage.protobuf", "com.google.protobuf")
     packagesToRelocate.forEach {
-        relocate(it, "$kotlinEmbeddableRootPackage.$it")
+        relocate("$kotlinEmbeddableRootPackage.$it", it)
     }
     // todo relocate("javax.inject", "$kotlinEmbeddableRootPackage.javax.inject")
-    relocate("org.fusesource", "$kotlinEmbeddableRootPackage.org.fusesource") {
+    relocate("$kotlinEmbeddableRootPackage.org.fusesource", "org.fusesource") {
         // TODO: remove "it." after #KT-12848 get addressed
         exclude("org.fusesource.jansi.internal.CLibrary")
     }
@@ -62,9 +63,9 @@ publishing {
             artifactId = project.name
             version = Build.version
 
-            //from(components["java"])
+            from(components["java"])
 
-            shadow.component(this)
+//            shadow.component(this)
         }
     }
 }

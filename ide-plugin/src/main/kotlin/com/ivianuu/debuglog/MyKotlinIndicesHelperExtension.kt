@@ -1,7 +1,6 @@
 package com.ivianuu.debuglog
 
 import com.ivianuu.debuglog.OpticsConst.OPTICS_CLASS_NAME
-import com.ivianuu.debuglog.OpticsConst.LENS_CLASS_NAME
 import org.jetbrains.kotlin.backend.common.descriptors.allParameters
 import org.jetbrains.kotlin.backend.common.descriptors.explicitParameters
 import org.jetbrains.kotlin.descriptors.*

@@ -1,6 +1,5 @@
 plugins {
     id("org.jetbrains.kotlin.jvm")
-    id("kotlin-kapt")
     id("org.jetbrains.intellij") version Versions.intellijGradlePlugin
 }
 
@@ -13,8 +12,12 @@ intellij {
 dependencies {
     implementation(Deps.kotlinStdLib)
 
-    api(project(":kotlin-plugin"))
+    api(project(":kotlin-plugin", configuration = "shadow"))
 
-    compileOnly(Deps.autoService)
-    kapt(Deps.autoService)
+    testCompile(Deps.arrowOptics)
+    testCompile(Deps.kotlinTest)
 }
+
+//tasks.withType<Test> {
+//    useJUnitPlatform()
+//}
