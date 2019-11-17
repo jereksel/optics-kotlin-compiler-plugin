@@ -13,6 +13,7 @@ dependencies {
     compileOnly(Deps.autoService)
     kapt(Deps.autoService)
 
+    testImplementation(Deps.kotlinCompilerEmbeddable)
     testImplementation(Deps.joor)
     testImplementation(Deps.arrowOptics)
     testImplementation(Deps.kotlinCompileTesting)
