@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
+import org.jetbrains.kotlin.storage.LockBasedStorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.KotlinTypeFactory
 import org.jetbrains.kotlin.types.TypeProjectionImpl
@@ -90,7 +91,8 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
                             false,
                             Variance.INVARIANT,
                             Name.identifier("A"),
-                            0
+                             0,
+                            LockBasedStorageManager.NO_LOCKS
                         )
 
                         val genericType = moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType ?: return

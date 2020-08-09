@@ -16,6 +16,8 @@ import org.jetbrains.kotlin.resolve.lazy.declarations.ClassMemberDeclarationProv
 import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
+import org.jetbrains.kotlin.storage.LockBasedStorageManager
+import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.KotlinTypeFactory
 import org.jetbrains.kotlin.types.TypeProjectionImpl
@@ -99,7 +101,8 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                         false,
                         Variance.INVARIANT,
                         Name.identifier("A"),
-                        0
+                        0,
+                        LockBasedStorageManager.NO_LOCKS
                     )
 
                     val left = KotlinTypeFactory.simpleType(

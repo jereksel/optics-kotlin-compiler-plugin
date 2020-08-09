@@ -9,12 +9,13 @@ object Versions {
     const val arrow = "0.10.3"
     const val joor = "0.9.7"
 
-    const val intellijIdea = "2019.2.4"
+    const val intellijIdea = "2020.2"
     const val intellijGradlePlugin = "0.4.11"
 
-    const val kotlin = "1.3.50"
-    const val kotlinIdeaPlugin = "1.3.50-release-IJ2019.2-1"
+    const val kotlin = "1.3.72"
+    const val kotlinIdeaPlugin = "1.3.72-release-IJ2020.1-5"
 
+    const val sonatypePlugin = "2.8"
     const val mavenGradlePlugin = "2.1"
     const val shadow = "4.0.3"
 }
