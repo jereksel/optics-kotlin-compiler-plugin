@@ -8,7 +8,6 @@ import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorFactory
 import org.jetbrains.kotlin.resolve.extensions.SyntheticResolveExtension
 import org.jetbrains.kotlin.resolve.lazy.LazyClassContext
@@ -17,13 +16,11 @@ import org.jetbrains.kotlin.resolve.scopes.DescriptorKindFilter
 import org.jetbrains.kotlin.resolve.scopes.MemberScopeImpl
 import org.jetbrains.kotlin.resolve.scopes.receivers.ExtensionReceiver
 import org.jetbrains.kotlin.storage.LockBasedStorageManager
-import org.jetbrains.kotlin.storage.StorageManager
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlin.types.KotlinTypeFactory
 import org.jetbrains.kotlin.types.TypeProjectionImpl
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.utils.Printer
-import java.util.ArrayList
 
 class MySyntheticResolveExtension : SyntheticResolveExtension {
 
@@ -93,7 +90,9 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
                         parameter.source
                     )
 
-                    val genericType = ctx.moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType ?: return
+                    val genericType =
+                        ctx.moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType
+                            ?: return
 
                     val typeParameterDescriptor = TypeParameterDescriptorImpl.createWithDefaultBound(
                         this,
@@ -141,7 +140,7 @@ class MySyntheticResolveExtension : SyntheticResolveExtension {
 
             }
 
-            val memberScope = object: MemberScopeImpl() {
+            val memberScope = object : MemberScopeImpl() {
 
                 override fun getContributedFunctions(
                     name: Name,

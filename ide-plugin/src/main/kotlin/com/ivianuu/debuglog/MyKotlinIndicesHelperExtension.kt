@@ -8,7 +8,6 @@ import org.jetbrains.kotlin.descriptors.annotations.Annotations
 import org.jetbrains.kotlin.descriptors.impl.*
 import org.jetbrains.kotlin.idea.core.extension.KotlinIndicesHelperExtension
 import org.jetbrains.kotlin.idea.imports.importableFqName
-import org.jetbrains.kotlin.incremental.KotlinLookupLocation
 import org.jetbrains.kotlin.incremental.components.LookupLocation
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
@@ -30,14 +29,30 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
         moduleDescriptor: ModuleDescriptor,
         receiverTypes: Collection<KotlinType>,
         nameFilter: (String) -> Boolean,
-        lookupLocation: LookupLocation) {
+        lookupLocation: LookupLocation
+    ) {
+        appendExtensionCallables0(consumer, moduleDescriptor, receiverTypes, nameFilter)
+    }
+
+    @Suppress("OverridingDeprecatedMember")
+    override fun appendExtensionCallables(
+        consumer: MutableList<in CallableDescriptor>,
+        moduleDescriptor: ModuleDescriptor,
+        receiverTypes: Collection<KotlinType>,
+        nameFilter: (String) -> Boolean
+    ) {
+        appendExtensionCallables0(consumer, moduleDescriptor, receiverTypes, nameFilter)
+    }
+
+    private fun appendExtensionCallables0(
+        consumer: MutableList<in CallableDescriptor>,
+        moduleDescriptor: ModuleDescriptor,
+        receiverTypes: Collection<KotlinType>,
+        nameFilter: (String) -> Boolean
+    ) {
 
         //Return collection with multiple elements
         val receiverType = receiverTypes.singleOrNull() ?: return
-
-        val location = (lookupLocation as? KotlinLookupLocation)?.element ?: return
-
-//        (lookupLocation.location as KotlinLookupLocation).element.
 
         //FIXME
         if (receiverType.constructor.declarationDescriptor?.fqNameSafe != lens) {
@@ -52,7 +67,8 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
 
         println((declarationDescriptor as? ClassDescriptor)?.constructors?.first()?.allParameters)
 
-        val parameters = (declarationDescriptor as? ClassDescriptor)?.constructors?.first()?.explicitParameters ?: return
+        val parameters =
+            (declarationDescriptor as? ClassDescriptor)?.constructors?.first()?.explicitParameters ?: return
 
         consumer.addAll(
             parameters
@@ -61,7 +77,10 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
                     PropertyDescriptorImpl.create(
 //                        moduleDescriptor,
 //                        moduleDescriptor.getPackage(location.containingKtFile.packageFqName),
-                        EmptyPackageFragmentDescriptor(moduleDescriptor, clzName.child(Name.identifier(OPTICS_CLASS_NAME))),
+                        EmptyPackageFragmentDescriptor(
+                            moduleDescriptor,
+                            clzName.child(Name.identifier(OPTICS_CLASS_NAME))
+                        ),
                         Annotations.EMPTY,
                         Modality.FINAL,
                         Visibilities.PUBLIC,
@@ -91,11 +110,13 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
                             false,
                             Variance.INVARIANT,
                             Name.identifier("A"),
-                             0,
+                            0,
                             LockBasedStorageManager.NO_LOCKS
                         )
 
-                        val genericType = moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType ?: return
+                        val genericType =
+                            moduleDescriptor.findClassAcrossModuleDependencies(ClassId.topLevel(lens))?.defaultType
+                                ?: return
 
                         val left = KotlinTypeFactory.simpleType(
                             genericType,
@@ -118,7 +139,8 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
                         )
 
                         val extensionReceiver = ExtensionReceiver(this, left, null)
-                        val receiverParameterDescriptor = ReceiverParameterDescriptorImpl(this, extensionReceiver, Annotations.EMPTY)
+                        val receiverParameterDescriptor =
+                            ReceiverParameterDescriptorImpl(this, extensionReceiver, Annotations.EMPTY)
 
                         getter.initialize(left)
                         initialize(getter, null)
@@ -130,21 +152,7 @@ class MyKotlinIndicesHelperExtension : KotlinIndicesHelperExtension {
 
         )
 
-        println(dataClass)
-        println(receiverType)
-        println(moduleDescriptor)
-        println(receiverTypes)
-        println(nameFilter)
-        println(lookupLocation)
     }
 
-    override fun appendExtensionCallables(
-        consumer: MutableList<in CallableDescriptor>,
-        moduleDescriptor: ModuleDescriptor,
-        receiverTypes: Collection<KotlinType>,
-        nameFilter: (String) -> Boolean
-    ) {
-        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-    }
 
 }
